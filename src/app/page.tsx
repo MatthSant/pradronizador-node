@@ -101,6 +101,35 @@ export default function Home() {
           </motion.div>
         ))}
       </div>
+
+      {/* SECURITY NOTICE */}
+      <motion.div 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.8 }}
+        className="mt-20 w-full max-w-4xl px-4"
+      >
+        <div className="bg-emerald-50/80 backdrop-blur-xl p-8 rounded-[2.5rem] border border-emerald-200 flex flex-col md:flex-row items-center md:items-start space-y-6 md:space-y-0 md:space-x-8 shadow-xl shadow-emerald-900/5">
+          <div className="w-16 h-16 bg-white border border-emerald-200 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-sm">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-8 h-8 text-emerald-600">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            </svg>
+          </div>
+          <div className="space-y-2 text-center md:text-left">
+            <h4 className="text-lg font-black uppercase tracking-tighter text-emerald-800">Segurança & Privacidade Prioritária</h4>
+            <p className="text-sm text-slate-600 font-medium leading-relaxed italic">
+              Seus dados sensíveis <span className="text-emerald-900 font-black border-b-2 border-emerald-400/30">nunca tocam nossos servidores</span>. 
+              Todo o processamento acontece localmente no seu navegador. Nenhuma informação é armazenada ou enviada para a nuvem, 
+              garantindo conformidade e privacidade total.
+            </p>
+            <div className="flex items-center justify-center md:justify-start space-x-4 pt-2">
+              <span className="text-[10px] font-black uppercase tracking-widest text-emerald-700/60">Processamento Client-Side</span>
+              <div className="w-1 h-1 bg-emerald-200 rounded-full" />
+              <span className="text-[10px] font-black uppercase tracking-widest text-emerald-700/60">Sem Coleta de Metadados</span>
+            </div>
+          </div>
+        </div>
+      </motion.div>
     </div>
   );
 }
