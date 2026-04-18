@@ -6,42 +6,53 @@ import { CheckCircle2, AlertTriangle, Trash2, ArrowRightLeft, Sparkles } from 'l
 import { motion } from 'framer-motion';
 
 interface MappingReviewProps {
-  mappings: Record<string, string>;
-  sourceColumns: string[];
+  mappings: Record<string, Record<string, string>>;
+  perFileData: Record<string, { headers: string[], samples: Record<string, string[]> }>;
   type: string;
+  customFieldLabels: Record<string, string>;
 }
 
-export const MappingReview: React.FC<MappingReviewProps> = ({ mappings, sourceColumns, type }) => {
+export const MappingReview: React.FC<MappingReviewProps> = ({ mappings, perFileData, type, customFieldLabels }) => {
   const summary = useMemo(() => {
-    // Mapped connections
-    const mapped = Object.entries(mappings)
-      .filter(([_, target]) => target !== '__NONE__' && target !== '__SKIP__')
-      .map(([source, target]) => ({ source, target, label: FIELD_DESCRIPTIONS[target]?.name || target }));
+    let totalMappedCount = 0;
+    let totalUnusedCount = 0;
+    const fileSummaries: { name: string, mapped: number, total: number }[] = [];
+    const allMappedTargets = new Set<string>();
 
-    // Unused source columns
-    const unused = sourceColumns.filter(col => !mappings[col] || mappings[col] === '__NONE__' || mappings[col] === '__SKIP__');
+    Object.entries(perFileData).forEach(([fileName, data]) => {
+      const fileMappings = mappings[fileName] || {};
+      const mappedInFile = Object.entries(fileMappings).filter(([_, t]) => t !== '__NONE__' && t !== '__SKIP__');
+      const unusedInFile = data.headers.filter(h => !fileMappings[h] || fileMappings[h] === '__NONE__' || fileMappings[h] === '__SKIP__');
+      
+      totalMappedCount += mappedInFile.length;
+      totalUnusedCount += unusedInFile.length;
+      
+      mappedInFile.forEach(([_, t]) => allMappedTargets.add(t));
+      
+      fileSummaries.push({
+        name: fileName,
+        mapped: mappedInFile.length,
+        total: data.headers.length
+      });
+    });
 
-    // Missing required fields for the specific type
-    const mappedTargetKeys = new Set(Object.values(mappings));
-    
-    // Determine which description keys are relevant to this operation
-    // For simplicity, we filter by mandatory status and common sense relevance
+    // Missing required fields (Global check)
     const missingRequired = Object.entries(FIELD_DESCRIPTIONS)
       .filter(([key, meta]) => {
         const isMandatory = meta.name.includes('(Obrigatório)');
         if (!isMandatory) return false;
         
-        // Filter relevance by type
-        if (type === 'events' && key.startsWith('field_transaction')) return false;
-        if (type === 'transactions' && key === 'field_action') return false;
-        if (type === 'survey' && (key.startsWith('utm_') || key.startsWith('field_transaction'))) return false;
+        const isGlobal = meta.category === 'global';
+        const isTypeSpecific = meta.category === type;
         
-        return !mappedTargetKeys.has(key);
+        if (!isGlobal && !isTypeSpecific) return false;
+        
+        return !allMappedTargets.has(key);
       })
       .map(([_, meta]) => meta.name);
 
-    return { mapped, unused, missingRequired };
-  }, [mappings, sourceColumns, type]);
+    return { totalMappedCount, totalUnusedCount, fileSummaries, missingRequired };
+  }, [mappings, perFileData, type]);
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -79,45 +90,56 @@ export const MappingReview: React.FC<MappingReviewProps> = ({ mappings, sourceCo
       )}
 
       <div className="grid md:grid-cols-2 gap-6">
-        {/* BLOCK 1: MAPPED CONNECTIONS */}
+        {/* BLOCK 1: FILE SYNC STATUS */}
         <div className="glass-card p-8 space-y-6 border-emerald-100 bg-emerald-50/[0.02]">
           <div className="flex items-center space-x-3 text-emerald-700">
             <CheckCircle2 className="w-5 h-5" />
-            <h4 className="text-sm font-black uppercase tracking-widest">Conexões Ativas ({summary.mapped.length})</h4>
+            <h4 className="text-sm font-black uppercase tracking-widest text-emerald-800">Sincronia por Arquivo</h4>
           </div>
           
           <div className="space-y-3">
-            {summary.mapped.length === 0 ? (
-              <p className="text-slate-400 text-xs italic">Nenhum mapeamento ativo encontrado.</p>
-            ) : (
-              summary.mapped.map((m, i) => (
-                <div key={i} className="flex items-center justify-between p-3 bg-white border border-emerald-100 rounded-xl shadow-sm">
-                  <span className="text-xs font-bold text-slate-600 truncate max-w-[140px]">{m.source}</span>
-                  <ArrowRightLeft className="w-3 h-3 text-emerald-300 mx-2 flex-shrink-0" />
-                  <span className="text-xs font-black text-emerald-700 text-right">{m.label.split('(')[0]}</span>
+            {summary.fileSummaries.map((f, i) => (
+              <div key={i} className="p-4 bg-white border border-emerald-100 rounded-2xl shadow-sm flex items-center justify-between">
+                <div className="flex items-center space-x-3 overflow-hidden">
+                  <div className="w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <span className="text-[10px] font-black text-emerald-700">{i + 1}</span>
+                  </div>
+                  <span className="text-xs font-bold text-slate-700 truncate" title={f.name}>{f.name}</span>
                 </div>
-              ))
-            )}
+                <div className="flex items-center space-x-2 flex-shrink-0">
+                  <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md">
+                    {f.mapped}/{f.total} colunas
+                  </span>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 
-        {/* BLOCK 2: UNUSED / IGNORED */}
-        <div className="glass-card p-8 space-y-6 border-slate-200 bg-slate-50/50">
+        {/* BLOCK 2: GLOBAL AUDIT STATS */}
+        <div className="glass-card p-8 space-y-8 border-slate-200 bg-slate-50/50">
           <div className="flex items-center space-x-3 text-slate-500">
             <Trash2 className="w-5 h-5" />
-            <h4 className="text-sm font-black uppercase tracking-widest">Campos Descartados ({summary.unused.length})</h4>
+            <h4 className="text-sm font-black uppercase tracking-widest">Resumo do Lote</h4>
           </div>
           
-          <div className="flex flex-wrap gap-2">
-            {summary.unused.length === 0 ? (
-              <p className="text-slate-400 text-xs italic">Todos os campos estão sendo utilizados.</p>
-            ) : (
-              summary.unused.map((col, i) => (
-                <span key={i} className="px-3 py-1.5 bg-white border border-slate-200 text-slate-500 text-[10px] font-bold rounded-lg uppercase tracking-tight">
-                  {col}
-                </span>
-              ))
-            )}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="p-6 bg-white border border-slate-200 rounded-2xl">
+              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">Total Mapeado</span>
+              <span className="text-3xl font-black text-emerald-600">{summary.totalMappedCount}</span>
+              <span className="text-[10px] text-slate-500 block mt-1 font-bold italic">campos consolidados</span>
+            </div>
+            <div className="p-6 bg-white border border-slate-200 rounded-2xl">
+              <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">Descartados</span>
+              <span className="text-3xl font-black text-slate-400">{summary.totalUnusedCount}</span>
+              <span className="text-[10px] text-slate-500 block mt-1 font-bold italic">serão ignorados</span>
+            </div>
+          </div>
+
+          <div className="p-4 bg-white/50 border border-slate-200 rounded-xl border-dashed">
+            <p className="text-[11px] text-slate-600 font-medium leading-relaxed">
+              <b>Nota do Auditor:</b> Todas as colunas mapeadas serão normalizadas conforme o dicionário <b>wtl_{type}</b>. Datas serão padronizadas para ISO e os e-mails serão limpos automaticamente.
+            </p>
           </div>
         </div>
       </div>
