@@ -9,23 +9,25 @@ import { MappingReview } from '@/components/MappingReview';
 import { StatusNormalizer } from '@/components/StatusNormalizer';
 import { FixedValueInjector } from '@/components/FixedValueInjector';
 import { processFiles, extractFileHeaders, discoverUniqueStatuses } from '@/lib/processor';
-import { ArrowLeft, Play, Download, CheckCircle2, ChevronRight, ChevronLeft, Layers, Loader2, Sparkles, ShieldCheck } from 'lucide-react';
-import * as XLSX from 'xlsx';
+import { ArrowLeft, Play, Download, CheckCircle2, ChevronRight, ChevronLeft, Layers, Loader2, Sparkles } from 'lucide-react';
+import { usePipeline } from '@/providers/PipelineContext';
 
 export default function ProcessorPage() {
   const { type } = useParams();
   const router = useRouter();
+  const { 
+    files, setFiles, 
+    mappings, setMappings, updateMapping,
+    customFields, addCustomField, 
+    statusMappings, setStatusMappings,
+    fixedValues, setFixedValues 
+  } = usePipeline();
   
   const [step, setStep] = useState<number>(1);
-  const [files, setFiles] = useState<File[]>([]);
   const [perFileData, setPerFileData] = useState<Record<string, { headers: string[], samples: Record<string, string[]> }>>({});
   const [activeMappingFileIdx, setActiveMappingFileIdx] = useState(0);
-  const [mappings, setMappings] = useState<Record<string, Record<string, string>>>({}); // fileName -> mappings
-  const [customFields, setCustomFields] = useState<{key: string, label: string}[]>([]);
-  const [statusMappings, setStatusMappings] = useState<Record<string, string>>({});
   const [discoveredStatuses, setDiscoveredStatuses] = useState<string[]>([]);
   const [isDiscoveringStatuses, setIsDiscoveringStatuses] = useState(false);
-  const [fixedValues, setFixedValues] = useState<Record<string, Record<string, string>>>({});
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingStatus, setProcessingStatus] = useState({ current: 0, total: 0, fileName: '' });
   const [isExtractingHeaders, setIsExtractingHeaders] = useState(false);
@@ -64,18 +66,8 @@ export default function ProcessorPage() {
   const updateMappingForActiveFile = useCallback((newFileMappings: Record<string, string>) => {
     const currentFile = files[activeMappingFileIdx];
     if (!currentFile) return;
-    
-    setMappings(prev => {
-      // Avoid unnecessary state updates if data is identical
-      if (JSON.stringify(prev[currentFile.name]) === JSON.stringify(newFileMappings)) {
-        return prev;
-      }
-      return {
-        ...prev,
-        [currentFile.name]: newFileMappings
-      };
-    });
-  }, [files, activeMappingFileIdx]);
+    updateMapping(currentFile.name, newFileMappings);
+  }, [files, activeMappingFileIdx, updateMapping]);
 
   const customFieldLabels = useMemo(() => {
     const labels: Record<string, string> = {};
@@ -84,13 +76,6 @@ export default function ProcessorPage() {
     });
     return labels;
   }, [customFields]);
-
-  const handleAddCustomField = useCallback((label: string) => {
-    const nextIdx = customFields.length + 1;
-    const newKey = `custom_field_${nextIdx}`;
-    setCustomFields(prev => [...prev, { key: newKey, label }]);
-    return newKey;
-  }, [customFields.length]);
 
   const handleStartStatusDiscovery = async () => {
     setIsDiscoveringStatuses(true);
@@ -112,7 +97,6 @@ export default function ProcessorPage() {
     setProcessingStatus({ current: 0, total: files.length, fileName: 'Iniciando...' });
     
     try {
-      // Use a small delay to allow UI to render first
       await new Promise(r => setTimeout(r, 100));
       
       const resp = await processFiles(
@@ -122,7 +106,6 @@ export default function ProcessorPage() {
         type as string,
         async (fileName, current, total) => {
           setProcessingStatus({ fileName, current, total });
-          // Force a tiny gap for React to render the progress update
           await new Promise(r => setTimeout(r, 10));
         },
         statusMappings
@@ -349,7 +332,7 @@ export default function ProcessorPage() {
                   customFieldLabels={customFieldLabels}
                   initialMappings={mappings[files[activeMappingFileIdx].name] || {}}
                   onMappingChange={updateMappingForActiveFile} 
-                  onAddCustomField={isSurvey ? handleAddCustomField : undefined}
+                  onAddCustomField={isSurvey ? addCustomField : undefined}
                 />
               )}
               <div className="flex flex-col md:flex-row justify-between items-center gap-6">
