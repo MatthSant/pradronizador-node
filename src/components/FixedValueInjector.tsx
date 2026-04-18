@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { FIELD_DESCRIPTIONS } from '@/lib/constants';
-import { X, Tag, Sparkles, FileStack } from 'lucide-react';
+import { X, Tag, Sparkles, FileStack, ChevronRight, Plus } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface FixedValueInjectorProps {
@@ -47,18 +47,15 @@ export const FixedValueInjector: React.FC<FixedValueInjectorProps> = ({
   const availableOptions = unmappedTargets.filter(t => !activeValues[t]);
 
   return (
-    <div className="grid lg:grid-cols-[380px_1fr] gap-8 animate-in fade-in duration-700">
-      {/* LEFT SIDEBAR: FILE SELECTOR */}
-      <div className="glass-card overflow-hidden border-slate-200 bg-white flex flex-col h-[600px]">
-        <div className="p-6 bg-slate-50 border-b border-slate-200">
-          <div className="flex items-center space-x-2 mb-1">
-            <FileStack className="w-4 h-4 text-slate-400" />
-            <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Document Deck</span>
-          </div>
-          <h4 className="text-lg font-black text-slate-900 tracking-tight">Arquivos do Lote</h4>
+    <div className="grid lg:grid-cols-[400px_1fr] gap-12 animate-in fade-in duration-1000">
+      {/* LEFT SIDEBAR: DOCUMENT INDEX */}
+      <div className="space-y-6">
+        <div className="flex items-center space-x-3 text-slate-400 mb-2">
+          <FileStack className="w-5 h-5" />
+          <h4 className="text-technical">Índice de Documentos</h4>
         </div>
         
-        <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-2">
+        <div className="space-y-3 max-h-[600px] overflow-y-auto custom-scrollbar pr-2">
           {files.map((file, idx) => {
             const tagCount = Object.keys(initialValues[file.name] || {}).length;
             const isActive = activeFileIdx === idx;
@@ -67,35 +64,31 @@ export const FixedValueInjector: React.FC<FixedValueInjectorProps> = ({
               <button
                 key={file.name}
                 onClick={() => setActiveFileIdx(idx)}
-                className={`w-full text-left p-4 rounded-2xl border transition-all flex items-center justify-between group ${
+                className={`w-full text-left p-6 rounded-[2rem] border transition-all duration-500 group relative overflow-hidden ${
                   isActive 
-                    ? 'bg-purple-700 border-purple-800 text-white shadow-lg shadow-purple-900/20' 
-                    : 'bg-white border-slate-100 hover:border-purple-200 hover:bg-purple-50'
+                    ? 'bg-slate-900 border-slate-900 text-white shadow-2xl shadow-slate-900/10' 
+                    : 'bg-white border-slate-100 hover:border-purple-200'
                 }`}
               >
-                <div className="flex items-center space-x-3 overflow-hidden">
-                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                    isActive ? 'bg-white/20' : 'bg-slate-100 group-hover:bg-purple-100'
-                  }`}>
-                    <Tag className={`w-4 h-4 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-purple-600'}`} />
+                <div className="flex items-center justify-between relative z-10">
+                  <div className="min-w-0 pr-4">
+                    <p className="text-sm font-bold truncate leading-tight mb-1">{file.name}</p>
+                    <span className={`text-technical ${isActive ? 'text-slate-400' : 'text-slate-300'}`}>
+                      {(file.size / 1024).toFixed(0)} KB
+                    </span>
                   </div>
-                  <div className="truncate">
-                    <p className={`text-[11px] font-black truncate ${isActive ? 'text-white' : 'text-slate-700'}`}>
-                      {file.name}
-                    </p>
-                    <p className={`text-[9px] font-medium ${isActive ? 'text-white/60' : 'text-slate-400'}`}>
-                      {Math.round(file.size / 1024)} KB
-                    </p>
-                  </div>
+                  
+                  {tagCount > 0 ? (
+                    <div className={`px-3 py-1 rounded-lg text-technical flex items-center space-x-1.5 ${
+                      isActive ? 'bg-white/10 text-emerald-400 border border-white/10' : 'bg-emerald-50 text-emerald-700'
+                    }`}>
+                      <div className={`w-1 h-1 rounded-full ${isActive ? 'bg-emerald-400 animate-pulse' : 'bg-emerald-600'}`} />
+                      <span>{tagCount} tags</span>
+                    </div>
+                  ) : (
+                    <ChevronRight className={`w-4 h-4 ${isActive ? 'text-white' : 'text-slate-200'} transition-transform group-hover:translate-x-1`} />
+                  )}
                 </div>
-                
-                {tagCount > 0 && (
-                  <span className={`px-2 py-1 rounded-lg text-[10px] font-black ${
-                    isActive ? 'bg-white text-purple-700' : 'bg-emerald-100 text-emerald-700'
-                  }`}>
-                    {tagCount}
-                  </span>
-                )}
               </button>
             );
           })}
@@ -103,48 +96,53 @@ export const FixedValueInjector: React.FC<FixedValueInjectorProps> = ({
       </div>
 
       {/* RIGHT CONTENT: PARAMETER INJECTOR */}
-      <div className="glass-card p-10 border-black/[0.12] bg-white space-y-8 flex flex-col h-[600px]">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-purple-100 pb-8">
+      <div className="glass-card p-12 border-slate-100 bg-white space-y-10 flex flex-col h-[700px]">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-slate-50 pb-10">
           <div className="space-y-1">
-            <div className="flex items-center space-x-2">
-              <Sparkles className="w-4 h-4 text-purple-700 animate-pulse" />
-              <h3 className="text-xl font-black tracking-tight text-slate-900">Configuração de Tags</h3>
+            <div className="flex items-center space-x-3">
+              <div className="p-2.5 bg-purple-50 rounded-xl border border-purple-100">
+                <Sparkles className="w-5 h-5 text-purple-600" />
+              </div>
+              <h3 className="text-2xl font-black tracking-tighter text-slate-900">Injeção Inteligente</h3>
             </div>
-            <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest">
-              Injetando dados em: <span className="text-purple-700">{activeFile?.name}</span>
+            <p className="text-technical text-slate-400 mt-2">
+              Adicionando metadados ao documento: <span className="text-slate-900 font-bold">{activeFile?.name}</span>
             </p>
           </div>
           
-          <div className="flex-shrink-0">
+          <div className="relative group">
             <select 
-              className="w-full md:w-64 bg-white border border-slate-300 rounded-xl text-[10px] font-black uppercase tracking-wider px-4 py-3 focus:ring-2 focus:ring-purple-200 outline-none transition-all appearance-none cursor-pointer hover:border-purple-400 shadow-xl shadow-purple-700/5 text-slate-800"
+              className="w-full md:w-72 bg-slate-50 border border-slate-100 rounded-2xl text-technical text-slate-600 px-6 py-4 focus:ring-4 focus:ring-purple-50 focus:border-purple-300 outline-none transition-all appearance-none cursor-pointer pr-12 font-bold"
               onChange={(e) => e.target.value !== "" && handleAdd(e.target.value)}
               value=""
             >
               <option value="">+ Injetar Novo Campo</option>
               {availableOptions.map(opt => (
                 <option key={opt} value={opt} className="text-slate-900">
-                  {FIELD_DESCRIPTIONS[opt]?.name || opt}
+                  {FIELD_DESCRIPTIONS[opt]?.name.split('(')[0] || opt}
                 </option>
               ))}
             </select>
+            <Plus className="absolute right-6 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none group-hover:rotate-90 transition-transform duration-500" />
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 pb-4">
-          <div className="grid gap-4">
+        <div className="flex-1 overflow-y-auto custom-scrollbar pr-4">
+          <div className="grid gap-6">
             <AnimatePresence mode="popLayout">
               {Object.entries(activeValues).length === 0 && (
                 <motion.div 
                   initial={{ opacity: 0 }} 
                   animate={{ opacity: 1 }}
-                  className="py-12 flex flex-col items-center justify-center text-center space-y-3 opacity-30"
+                  className="py-24 flex flex-col items-center justify-center text-center space-y-4 text-slate-300"
                 >
-                  <Tag className="w-12 h-12 text-slate-900 mb-2" />
-                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-900">Sem tags para este arquivo</p>
-                  <p className="text-[9px] font-medium text-slate-500 max-w-[200px]">
-                    Use o seletor acima para injetar campos fixos que não existem neste documento.
-                  </p>
+                  <Tag className="w-16 h-16 opacity-10" />
+                  <div className="space-y-1">
+                    <p className="text-technical">Configuração Limpa</p>
+                    <p className="text-xs font-medium max-w-[280px] leading-relaxed">
+                      Use o menu superior para injetar campos globais que não constam na fonte original.
+                    </p>
+                  </div>
                 </motion.div>
               )}
 
@@ -155,32 +153,31 @@ export const FixedValueInjector: React.FC<FixedValueInjectorProps> = ({
                   initial={{ opacity: 0, scale: 0.98, y: 10 }}
                   animate={{ opacity: 1, scale: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.95 }}
-                  transition={{ duration: 0.2 }}
-                  className="flex items-center space-x-6 bg-slate-50 p-6 rounded-3xl border border-slate-200 hover:bg-white hover:border-purple-300 hover:shadow-xl hover:shadow-purple-700/5 transition-all group"
+                  transition={{ duration: 0.4 }}
+                  className="flex flex-col md:flex-row items-center space-x-0 md:space-x-8 space-y-6 md:space-y-0 bg-slate-50/50 p-8 rounded-[2.5rem] border border-slate-100 hover:bg-white hover:border-purple-200 transition-all duration-500 group shadow-sm hover:shadow-xl hover:shadow-purple-900/5"
                 >
-                  <div className="w-48">
-                    <span className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] mb-1.5 block">Atributo Alvo</span>
-                    <p className="text-[11px] font-black text-purple-800 uppercase tracking-widest truncate">
+                  <div className="w-full md:w-56 space-y-1">
+                    <span className="text-technical text-slate-400 block">Atributo de Destino</span>
+                    <p className="text-base font-bold text-slate-900 truncate">
                       {FIELD_DESCRIPTIONS[target]?.name.split('(')[0] || target}
                     </p>
-                    <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter">Destino Final</span>
                   </div>
 
-                  <div className="flex-1">
-                    <span className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] mb-1.5 block">Valor Gravado</span>
+                  <div className="flex-1 w-full">
+                    <span className="text-technical text-slate-400 mb-3 block">Conteúdo Fixo</span>
                     <input 
                       autoFocus
                       type="text"
-                      placeholder="Ex: Campanha XPTO..."
+                      placeholder="Valor que se repetirá em todas as linhas..."
                       value={val}
                       onChange={(e) => handleValueChange(target, e.target.value)}
-                      className="w-full bg-white border border-slate-300 rounded-2xl px-5 py-3.5 text-xs text-slate-800 font-bold focus:ring-4 focus:ring-purple-100 focus:border-purple-400 outline-none transition-all placeholder:text-slate-400 shadow-sm"
+                      className="w-full bg-white border border-slate-100 rounded-[1.5rem] px-6 py-4 text-sm text-slate-900 font-bold focus:ring-4 focus:ring-purple-50 focus:border-purple-300 outline-none transition-all placeholder:text-slate-200"
                     />
                   </div>
 
                   <button 
                     onClick={() => handleRemove(target)}
-                    className="p-3 bg-white border border-slate-200 hover:bg-red-50 hover:border-red-200 text-slate-400 hover:text-red-600 rounded-2xl transition-all self-end mb-1"
+                    className="p-4 bg-white border border-slate-100 hover:bg-rose-50 hover:border-rose-100 text-slate-300 hover:text-rose-500 rounded-2xl transition-all self-end md:self-center"
                   >
                     <X className="w-5 h-5" />
                   </button>

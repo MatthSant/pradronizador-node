@@ -3,98 +3,113 @@
 import React from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { MousePointer2, ClipboardList, TrendingUp, ArrowRight, Sparkles } from 'lucide-react';
+import { MousePointer2, ClipboardList, TrendingUp, ArrowRight, Sparkles, ShieldCheck } from 'lucide-react';
 
 const options = [
   {
     title: "wtl_events",
-    desc: "Processamento de leads, visualizações e cadastros em tempo real.",
+    desc: "Processamento e rastreio de leads, visualizações e cadastros em tempo real.",
     icon: MousePointer2,
-    accent: "text-blue-700",
-    bg: "bg-blue-100/50",
-    border: "border-blue-200",
-    href: "/processor/events"
+    accent: "text-blue-600",
+    href: "/processor/events",
+    delay: 0.1
   },
   {
     title: "wtl_survey",
-    desc: "Análise de pesquisas de censo e satisfação com dicionário dinâmico.",
+    desc: "Análise profunda de pesquisas de censo e satisfação com dicionário dinâmico.",
     icon: ClipboardList,
-    accent: "text-purple-700",
-    bg: "bg-purple-100/50",
-    border: "border-purple-200",
-    href: "/processor/survey"
+    accent: "text-purple-600",
+    href: "/processor/survey",
+    delay: 0.2
   },
   {
     title: "wtl_transactions",
     desc: "Estruturação de vendas e histórico financeiro com de/para inteligente.",
     icon: TrendingUp,
-    accent: "text-emerald-700",
-    bg: "bg-emerald-100/50",
-    border: "border-emerald-200",
-    href: "/processor/transactions"
+    accent: "text-emerald-600",
+    href: "/processor/transactions",
+    delay: 0.3
   }
 ];
 
 export default function Home() {
   return (
-    <div className="flex flex-col items-center justify-center min-h-[85vh] py-12">
-      <div className="relative mb-16 px-4">
+    <div className="flex flex-col items-center min-h-[85vh] py-16">
+      {/* HERO SECTION */}
+      <div className="relative mb-24 px-4 w-full max-w-5xl">
         <motion.div
-          initial={{ opacity: 0, scale: 0.98 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.8, ease: "circOut" }}
-          className="text-center space-y-6"
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+          className="text-center space-y-10"
         >
-          <div className="inline-flex items-center space-x-2 px-3 py-1 bg-purple-100/50 border border-purple-200 rounded-full mb-4">
-            <Sparkles className="w-3.5 h-3.5 text-purple-700" />
-            <span className="text-[10px] font-black uppercase tracking-[0.25em] text-purple-800">DataStruct v1.0</span>
+          <div className="inline-flex items-center space-x-3 px-4 py-1.5 bg-white border border-slate-100 rounded-full shadow-sm">
+            <Sparkles className="w-3.5 h-3.5 text-purple-600" />
+            <span className="text-technical text-slate-500">Workspace Operacional v1.0</span>
           </div>
           
-          <h1 className="text-6xl md:text-8xl font-black tracking-tighter leading-[0.9] text-slate-900">
+          <h1 className="text-6xl md:text-8xl lg:text-9xl font-black tracking-tighter leading-[0.9] text-slate-900">
             Estruture seus <br />
-            <span className="heading-accent">Dados Históricos</span>
+            <span className="text-purple-600 italic pb-2 inline-block">Dados Históricos</span>
           </h1>
           
-          <p className="text-lg text-slate-600 max-w-2xl mx-auto font-medium leading-relaxed pt-4">
-            Transforme arquivos brutos em tabelas normalizadas prontas para análise. 
-            Processamento <span className="text-slate-900 border-b-2 border-purple-300">100% privado</span> no seu navegador.
-          </p>
+          <div className="space-y-10">
+            <p className="text-lg md:text-xl text-slate-500 max-w-2xl mx-auto font-medium leading-relaxed">
+              A infraestrutura definitiva para normalização de tabelas e limpeza de dados. 
+              Processamento <span className="text-slate-900 border-b-2 border-purple-200">100% isolado</span> no browser.
+            </p>
+
+            <button 
+              onClick={() => document.getElementById('services')?.scrollIntoView()}
+              className="premium-button px-12 py-5 rounded-3xl inline-flex items-center space-x-3 hover:scale-105 active:scale-95 transition-all"
+            >
+              <span>Começar Agora</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
         </motion.div>
       </div>
 
-      <div className="grid md:grid-cols-3 gap-6 w-full max-w-6xl px-4">
-        {options.map((opt, idx) => (
+      {/* SERVICE GRID */}
+      <div id="services" className="grid md:grid-cols-3 gap-8 w-full max-w-6xl px-4 pt-16">
+        {options.map((opt) => (
           <motion.div
             key={opt.title}
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ 
-              duration: 0.8, 
-              delay: idx * 0.12,
-              ease: [0.16, 1, 0.3, 1] 
-            }}
+            transition={{ duration: 0.8, delay: opt.delay, ease: [0.16, 1, 0.3, 1] }}
           >
             <Link 
               href={opt.href} 
-              className={`flex flex-col h-full glass-card p-10 group transition-all duration-500 hover:shadow-2xl hover:shadow-purple-700/10 hover:-translate-y-2`}
+              className="group flex flex-col h-full glass-card p-12 hover:bg-white transition-all duration-500 border border-slate-100/50 hover:shadow-2xl hover:shadow-purple-500/5 hover:-translate-y-2"
             >
-              <div className={`w-14 h-14 ${opt.bg} ${opt.border} border-2 rounded-2xl flex items-center justify-center mb-8 transition-all group-hover:scale-110 duration-500`}>
-                <opt.icon className={`${opt.accent} w-6 h-6`} />
-              </div>
-              
-              <div className="flex-grow space-y-3">
-                <h3 className="text-2xl font-black tracking-tight text-slate-900 group-hover:text-purple-800 transition-colors">
+              <div className="flex-grow space-y-6">
+                <div className="flex items-center justify-between">
+                  <span className="text-technical text-slate-400 group-hover:text-purple-600 transition-colors">
+                    Pipeline AT-0{options.indexOf(opt) + 1}
+                  </span>
+                  <div className="w-10 h-10 rounded-full border border-slate-100 flex items-center justify-center group-hover:bg-purple-600 group-hover:border-purple-600 transition-all duration-500">
+                    <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-white transition-transform group-hover:translate-x-0.5" />
+                  </div>
+                </div>
+
+                <h3 className="text-3xl font-black tracking-tighter text-slate-900 leading-none">
                   {opt.title}
                 </h3>
-                <p className="text-slate-700 text-sm leading-relaxed font-medium">
+                
+                <p className="text-slate-500 text-sm leading-relaxed font-medium">
                   {opt.desc}
                 </p>
               </div>
 
-              <div className="mt-10 flex items-center text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 group-hover:text-purple-800 transition-all">
-                Iniciar Operação 
-                <div className="ml-auto w-10 h-10 border border-slate-300 rounded-full flex items-center justify-center group-hover:bg-purple-700 group-hover:border-purple-700 transition-all">
-                  <ArrowRight className="w-4 h-4 text-slate-500 group-hover:text-white transition-transform group-hover:translate-x-1" />
+              <div className="mt-12 pt-8 border-t border-slate-50 flex items-center space-x-12">
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-black uppercase text-slate-400">Motor</span>
+                  <span className="text-[11px] font-bold text-slate-900 uppercase">Universal Engine</span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-black uppercase text-slate-400">Status</span>
+                  <span className="text-[11px] font-bold text-emerald-600 uppercase">Operacional</span>
                 </div>
               </div>
             </Link>
@@ -102,31 +117,24 @@ export default function Home() {
         ))}
       </div>
 
-      {/* SECURITY NOTICE */}
+      {/* SECURITY FOOTER */}
       <motion.div 
         initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.8 }}
-        className="mt-20 w-full max-w-4xl px-4"
+        whileInView={{ opacity: 1 }}
+        viewport={{ once: true }}
+        transition={{ delay: 0.6 }}
+        className="mt-32 w-full max-w-4xl px-4"
       >
-        <div className="bg-emerald-50/80 backdrop-blur-xl p-8 rounded-[2.5rem] border border-emerald-200 flex flex-col md:flex-row items-center md:items-start space-y-6 md:space-y-0 md:space-x-8 shadow-xl shadow-emerald-900/5">
-          <div className="w-16 h-16 bg-white border border-emerald-200 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-sm">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-8 h-8 text-emerald-600">
-              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-            </svg>
+        <div className="bg-emerald-50/50 border border-emerald-100/50 p-10 rounded-[3rem] flex flex-col md:flex-row items-center space-y-8 md:space-y-0 md:space-x-12 backdrop-blur-md">
+          <div className="w-20 h-20 bg-white border border-emerald-200 rounded-3xl flex items-center justify-center flex-shrink-0 shadow-lg shadow-emerald-900/5">
+            <ShieldCheck className="w-10 h-10 text-emerald-600" />
           </div>
-          <div className="space-y-2 text-center md:text-left">
-            <h4 className="text-lg font-black uppercase tracking-tighter text-emerald-800">Segurança & Privacidade Prioritária</h4>
-            <p className="text-sm text-slate-600 font-medium leading-relaxed italic">
-              Seus dados sensíveis <span className="text-emerald-900 font-black border-b-2 border-emerald-400/30">nunca tocam nossos servidores</span>. 
-              Todo o processamento acontece localmente no seu navegador. Nenhuma informação é armazenada ou enviada para a nuvem, 
-              garantindo conformidade e privacidade total.
+          <div className="space-y-3 text-center md:text-left">
+            <h4 className="text-xl font-black tracking-tight text-emerald-900 uppercase">Privacidade por Design (PBD)</h4>
+            <p className="text-sm text-slate-500 font-medium leading-relaxed italic max-w-xl">
+              Nossa arquitetura técnica assegura que <span className="text-emerald-800 font-black">nenhum dado sensível</span> toque nossos servidores. 
+              O processamento ocorre integralmente no seu navegador, garantindo conformidade absoluta com normas globais de privacidade.
             </p>
-            <div className="flex items-center justify-center md:justify-start space-x-4 pt-2">
-              <span className="text-[10px] font-black uppercase tracking-widest text-emerald-700/60">Processamento Client-Side</span>
-              <div className="w-1 h-1 bg-emerald-200 rounded-full" />
-              <span className="text-[10px] font-black uppercase tracking-widest text-emerald-700/60">Sem Coleta de Metadados</span>
-            </div>
           </div>
         </div>
       </motion.div>

@@ -127,21 +127,21 @@ export const MappingInterface: React.FC<MappingInterfaceProps> = ({
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.95 }}
-      className={`flex flex-col space-y-3 p-5 rounded-2xl border transition-all group relative ${
+      className={`flex flex-col space-y-3 p-6 rounded-3xl border transition-all group relative ${
         mappings[col] === '__SKIP__' 
-          ? 'bg-slate-50 border-slate-200 opacity-60' 
+          ? 'bg-slate-50 border-slate-100 opacity-60' 
           : mappings[col] && mappings[col] !== '__NONE__'
-          ? 'bg-emerald-50/30 border-emerald-100 shadow-sm'
+          ? 'bg-emerald-50/20 border-emerald-100 shadow-sm'
           : 'bg-white border-slate-100 hover:border-purple-200 hover:shadow-md'
       }`}
     >
-      <div className="flex items-center justify-between gap-6">
+      <div className="flex items-center justify-between gap-8">
         <div className="flex-1 min-w-0 flex flex-col items-start relative">
-          <div className="flex items-center space-x-2 mb-1.5 h-4">
-            <span className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] block font-mono">Header do Arquivo</span>
-            <Info className="w-3 h-3 text-slate-400" />
+          <div className="flex items-center space-x-2 mb-2 h-4">
+            <span className="text-technical text-slate-600">Header Origem</span>
+            <Info className="w-3 h-3 text-slate-300" />
           </div>
-          <p className="text-sm font-black text-slate-800 break-words leading-tight" title={col}>{col}</p>
+          <p className="text-base font-bold text-slate-900 break-words leading-tight" title={col}>{col}</p>
 
           <AnimatePresence>
             {hoveredCol === col && sourceSamples[col] && sourceSamples[col].length > 0 && (
@@ -149,20 +149,20 @@ export const MappingInterface: React.FC<MappingInterfaceProps> = ({
                 initial={{ opacity: 0, y: 10, scale: 0.95 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 5, scale: 0.95 }}
-                className="absolute z-50 top-full left-0 mt-2 p-4 bg-white/95 backdrop-blur-xl border border-purple-200 rounded-2xl shadow-2xl shadow-purple-900/10 min-w-[200px]"
+                className="absolute z-50 top-full left-0 mt-4 p-5 bg-white backdrop-blur-xl border border-slate-200 rounded-[1.5rem] shadow-2xl min-w-[240px]"
               >
-                <div className="flex items-center space-x-2 mb-3 border-b border-purple-100 pb-2">
-                  <Sparkles className="w-3 h-3 text-purple-600" />
-                  <span className="text-[9px] font-black uppercase tracking-widest text-slate-600">Amostra de Dados</span>
+                <div className="flex items-center space-x-2 mb-4 border-b border-slate-50 pb-3">
+                  <Sparkles className="w-3.5 h-3.5 text-purple-600" />
+                  <span className="text-technical text-slate-500">Amostra de Valores</span>
                 </div>
-                <div className="space-y-1.5">
+                <div className="space-y-2">
                   {sourceSamples[col].map((val, idx) => (
                     <motion.div 
                       key={idx}
                       initial={{ opacity: 0, x: -10 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: idx * 0.05 }}
-                      className="text-[10px] font-bold text-slate-700 bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-100 truncate shadow-sm"
+                      className="text-[11px] font-medium text-slate-600 bg-slate-50 px-3 py-2 rounded-xl border border-slate-100 truncate"
                     >
                       {String(val)}
                     </motion.div>
@@ -173,20 +173,20 @@ export const MappingInterface: React.FC<MappingInterfaceProps> = ({
           </AnimatePresence>
         </div>
         
-        <div className="flex-shrink-0 pt-5">
-          <ChevronRight className={`w-5 h-5 transition-colors ${mappings[col] && mappings[col] !== '__NONE__' && mappings[col] !== '__SKIP__' ? 'text-emerald-400' : 'text-slate-300 group-hover:text-purple-500'}`} />
+        <div className="flex-shrink-0 pt-6">
+          <ChevronRight className={`w-6 h-6 transition-colors ${mappings[col] && mappings[col] !== '__NONE__' && mappings[col] !== '__SKIP__' ? 'text-emerald-500' : 'text-slate-200 group-hover:text-purple-400'}`} />
         </div>
         
-        <div className="flex-1 min-w-0 flex items-center space-x-2">
+        <div className="flex-1 min-w-0 flex items-center space-x-3">
           <div className="flex-1">
-            <span className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] mb-1.5 block font-mono">Alvo de Sincronia</span>
+            <span className="text-technical text-slate-600 mb-2 block">Destino Padronizado</span>
             <select 
               disabled={mappings[col] === '__SKIP__'}
               value={mappings[col] === '__SKIP__' ? '__NONE__' : (mappings[col] || '__NONE__')}
               onChange={(e) => handleSelect(col, e.target.value)}
               onMouseEnter={() => setHoveredCol(col)}
               onMouseLeave={() => setHoveredCol(null)}
-              className="w-full bg-white border border-slate-300 rounded-xl text-[10px] font-black uppercase tracking-wider px-3 py-2.5 focus:ring-2 focus:ring-purple-200 outline-none transition-all appearance-none cursor-pointer hover:border-purple-400 text-slate-800 disabled:bg-slate-100 disabled:cursor-not-allowed"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl text-[11px] font-bold uppercase tracking-wider px-4 py-3 focus:ring-4 focus:ring-purple-100 outline-none transition-all appearance-none cursor-pointer hover:border-purple-300 text-slate-800 disabled:opacity-30"
             >
               {targetOptions.map(opt => (
                 <option key={opt.id} value={opt.id} className="text-slate-900">
@@ -196,14 +196,14 @@ export const MappingInterface: React.FC<MappingInterfaceProps> = ({
             </select>
           </div>
           
-          <div className="pt-5 flex items-center space-x-3">
+          <div className="pt-6 flex items-center space-x-3">
             <button 
               onClick={() => toggleSkip(col)}
               title={mappings[col] === '__SKIP__' ? "Resgatar Campo" : "Descartar Campo"}
-              className={`p-2.5 rounded-xl border transition-all ${
+              className={`p-3 rounded-xl border transition-all ${
                 mappings[col] === '__SKIP__'
-                  ? 'bg-purple-600 border-purple-600 text-white shadow-lg hover:bg-purple-700 shadow-purple-900/20'
-                  : 'bg-white border-slate-200 text-slate-400 hover:text-red-500 hover:border-red-200 hover:bg-red-50'
+                  ? 'bg-slate-900 border-slate-900 text-white shadow-lg'
+                  : 'bg-white border-slate-200 text-slate-300 hover:text-red-500 hover:border-red-100 hover:bg-red-50'
               }`}
             >
               {mappings[col] === '__SKIP__' ? <RotateCcw className="w-4 h-4" /> : <Trash2 className="w-4 h-4" />}
@@ -211,12 +211,12 @@ export const MappingInterface: React.FC<MappingInterfaceProps> = ({
 
             <div className="w-8 flex justify-center">
               {mappings[col] === '__SKIP__' ? null : mappings[col] !== '__NONE__' ? (
-                <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="p-1.5 bg-emerald-100 rounded-full border border-emerald-400">
-                  <Check className="w-4 h-4 text-emerald-700" />
+                <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="p-1.5 bg-emerald-50 rounded-full border border-emerald-200 text-emerald-600">
+                  <CheckCircle className="w-5 h-5" />
                 </motion.div>
               ) : (
-                <div className="p-1.5 bg-amber-100 border border-amber-300 rounded-full">
-                  <AlertCircle className="w-4 h-4 text-amber-600" />
+                <div className="p-1.5 bg-amber-50 border border-amber-100 rounded-full text-amber-500">
+                  <AlertCircle className="w-5 h-5 animate-pulse" />
                 </div>
               )}
             </div>
@@ -227,59 +227,65 @@ export const MappingInterface: React.FC<MappingInterfaceProps> = ({
   );
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-700">
-      <div className="glass-card mb-8 p-10 bg-slate-900 border-white/[0.1] relative overflow-hidden group shadow-2xl shadow-purple-900/10">
-        <div className="absolute top-0 right-0 p-12 opacity-5 group-hover:opacity-10 transition-opacity">
-          <FileStack className="w-48 h-48 text-white" />
+    <div className="space-y-12 animate-in fade-in duration-1000">
+      <div className="glass-card mb-12 p-10 bg-white/40 border-slate-100 relative overflow-hidden group shadow-xl shadow-purple-900/5">
+        <div className="absolute top-0 right-0 p-10 opacity-5 group-hover:opacity-10 transition-opacity">
+          <FileStack className="w-40 h-40 text-purple-600" />
         </div>
-        <div className="relative z-10 space-y-5">
+        <div className="relative z-10 space-y-8">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-            <div className="flex items-center space-x-3">
-               <div className="px-3.5 py-1.5 bg-purple-500/20 border border-purple-400/30 rounded-full backdrop-blur-md">
-                 <span className="text-[10px] font-black uppercase text-purple-200 tracking-[0.2em]">Documento {fileIndex + 1} de {totalFiles}</span>
+            <div className="flex items-center space-x-5">
+               <div className="px-4 py-1.5 bg-purple-600 border border-purple-500 rounded-full shadow-lg shadow-purple-600/10">
+                 <span className="text-[9px] font-black uppercase tracking-[0.2em] text-white">Artefato {fileIndex + 1} de {totalFiles}</span>
                </div>
-               <div className="h-1.5 w-32 bg-white/10 rounded-full overflow-hidden border border-white/5">
+               <div className="h-0.5 w-32 bg-slate-100 rounded-full overflow-hidden">
                  <motion.div 
                    initial={{ width: 0 }}
                    animate={{ width: `${((fileIndex + 1) / totalFiles) * 100}%` }}
-                   className="h-full bg-gradient-to-r from-purple-500 to-indigo-400 shadow-[0_0_10px_rgba(168,85,247,0.5)]"
+                   className="h-full bg-purple-500"
                  />
                </div>
             </div>
             {type === 'transactions' && (
               <button 
                 onClick={applyHotmartPreset}
-                className="flex items-center space-x-2 text-[10px] font-black text-white uppercase tracking-widest bg-emerald-600 hover:bg-emerald-700 border border-emerald-500 px-5 py-2.5 rounded-xl transition-all group shadow-lg shadow-emerald-900/20 active:scale-95"
+                className="flex items-center space-x-2 text-technical text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-5 py-2.5 rounded-full transition-all group active:scale-95 shadow-sm"
               >
-                <Sparkles className="w-4 h-4 group-hover:rotate-12 transition-transform" />
-                <span>Ligar Mapeamento Hotmart</span>
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Aplicar Preset Hotmart</span>
               </button>
             )}
           </div>
-          <div className="space-y-1">
-            <h2 className="text-4xl font-black text-white tracking-tighter leading-tight text-balance">
-              Mapeando <span className="text-purple-400 italic">"{activeFileName}"</span>
-            </h2>
-            <p className="text-slate-400 text-sm font-medium max-w-2xl text-pretty">
-              Conecte os cabeçalhos do seu arquivo aos campos padronizados do sistema. Use campos customizados para capturar perguntas específicas de pesquisas.
+          <div className="space-y-3">
+            <div className="flex flex-col md:flex-row md:items-baseline md:space-x-4">
+              <h2 className="text-3xl font-black text-slate-900 tracking-tight leading-none">
+                Mapeando
+              </h2>
+              <span className="text-xl font-bold text-purple-600 italic truncate max-w-lg" title={activeFileName}>
+                "{activeFileName}"
+              </span>
+            </div>
+            <p className="text-slate-500 text-sm font-medium max-w-2xl leading-relaxed">
+              Mapeie os cabeçalhos originais para os padrões de inteligência da rede. 
+              Use campos customizados para capturar dados granulares.
             </p>
           </div>
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-4 mb-4 items-center justify-between">
+      <div className="flex flex-wrap gap-6 mb-8 items-center justify-between">
         <div className="flex gap-4">
-          <div className="px-5 py-3 bg-white border border-slate-200 rounded-2xl shadow-sm flex items-center space-x-3">
+          <div className="px-6 py-3 bg-white border border-slate-100 rounded-2xl shadow-sm flex items-center space-x-3">
             <ListFilter className="w-4 h-4 text-slate-400" />
-            <span className="text-xs font-black uppercase tracking-widest text-slate-700 font-mono">
-              Status: {groups.mapped.length}/{safeSourceColumns.length - groups.skipped.length} Sincronizados
+            <span className="text-technical text-slate-600">
+              Mapeamento: {groups.mapped.length}/{safeSourceColumns.length - groups.skipped.length} Colunas
             </span>
           </div>
           {groups.pending.length > 0 && (
-            <div className="px-5 py-3 bg-amber-50 border border-amber-200 rounded-2xl shadow-sm flex items-center space-x-3">
-              <AlertCircle className="w-4 h-4 text-amber-600 animate-pulse" />
-              <span className="text-xs font-black uppercase tracking-widest text-amber-700 font-mono">
-                Pendente: {groups.pending.length}
+            <div className="px-6 py-3 bg-white border border-rose-100 rounded-2xl shadow-sm flex items-center space-x-3">
+              <div className="w-2 h-2 bg-rose-500 rounded-full animate-pulse" />
+              <span className="text-technical text-rose-600">
+                Pendentes: {groups.pending.length}
               </span>
             </div>
           )}
@@ -294,15 +300,15 @@ export const MappingInterface: React.FC<MappingInterfaceProps> = ({
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95 }}
-            className="glass-card overflow-hidden border-amber-200 bg-white"
+            className="glass-card overflow-hidden border-rose-100 bg-white"
           >
-            <div className="px-8 py-5 bg-amber-50 border-b border-amber-100 flex items-center justify-between">
-              <div className="flex items-center space-x-3 text-amber-700">
-                <AlertCircle className="w-5 h-5 animate-pulse" />
-                <h4 className="text-sm font-black uppercase tracking-[0.2em] font-mono italic text-pretty">Faltam Mapear ({groups.pending.length})</h4>
+            <div className="px-10 py-6 bg-rose-50/30 border-b border-rose-50 flex items-center justify-between">
+              <div className="flex items-center space-x-3 text-rose-600">
+                <AlertCircle className="w-5 h-5" />
+                <h4 className="text-technical italic">Aguardando Mapeamento ({groups.pending.length})</h4>
               </div>
             </div>
-            <div className="p-8 space-y-4 max-h-[500px] overflow-y-auto custom-scrollbar">
+            <div className="p-10 space-y-6 max-h-[600px] overflow-y-auto custom-scrollbar">
               {groups.pending.map((col, idx) => renderColumnRow(col, idx))}
             </div>
           </motion.div>
@@ -316,15 +322,15 @@ export const MappingInterface: React.FC<MappingInterfaceProps> = ({
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="glass-card overflow-hidden border-emerald-200 bg-white"
+              className="glass-card overflow-hidden border-emerald-100 bg-white"
             >
-              <div className="px-8 py-5 bg-emerald-50 border-b border-emerald-100 flex items-center justify-between">
-                <div className="flex items-center space-x-3 text-emerald-700">
+              <div className="px-10 py-6 bg-emerald-50/30 border-b border-emerald-50 flex items-center justify-between">
+                <div className="flex items-center space-x-3 text-emerald-600">
                   <CheckCircle className="w-5 h-5" />
-                  <h4 className="text-sm font-black uppercase tracking-[0.2em] font-mono italic text-pretty">Sincronizados ({groups.mapped.length})</h4>
+                  <h4 className="text-technical italic">Vínculos Ativos ({groups.mapped.length})</h4>
                 </div>
               </div>
-              <div className="p-6 space-y-4 max-h-[500px] overflow-y-auto custom-scrollbar">
+              <div className="p-8 space-y-6 max-h-[600px] overflow-y-auto custom-scrollbar">
                 {groups.mapped.map((col, idx) => renderColumnRow(col, idx))}
               </div>
             </motion.div>
@@ -339,13 +345,13 @@ export const MappingInterface: React.FC<MappingInterfaceProps> = ({
               exit={{ opacity: 0, scale: 0.95 }}
               className="glass-card overflow-hidden border-slate-200 bg-slate-50/30"
             >
-              <div className="px-8 py-5 bg-slate-100 border-b border-slate-200 flex items-center justify-between">
-                <div className="flex items-center space-x-3 text-slate-500">
+              <div className="px-10 py-6 bg-slate-100/50 border-b border-slate-100 flex items-center justify-between">
+                <div className="flex items-center space-x-3 text-slate-400">
                   <Ban className="w-5 h-5" />
-                  <h4 className="text-sm font-black uppercase tracking-[0.2em] font-mono italic text-pretty">Descartados ({groups.skipped.length})</h4>
+                  <h4 className="text-technical italic">Colunas Descartadas ({groups.skipped.length})</h4>
                 </div>
               </div>
-              <div className="p-6 space-y-4 max-h-[500px] overflow-y-auto custom-scrollbar grayscale opacity-80">
+              <div className="p-8 space-y-6 max-h-[600px] overflow-y-auto custom-scrollbar grayscale opacity-60">
                 {groups.skipped.map((col, idx) => renderColumnRow(col, idx))}
               </div>
             </motion.div>
@@ -361,55 +367,55 @@ export const MappingInterface: React.FC<MappingInterfaceProps> = ({
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setCreatingForCol(null)}
-              className="absolute inset-0 bg-slate-900/60 backdrop-blur-md"
+              className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
             />
             <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="relative w-full max-w-xl bg-white rounded-[2.5rem] shadow-2xl border border-white overflow-hidden"
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-xl bg-white rounded-[3rem] shadow-2xl border border-slate-100 overflow-hidden"
             >
-              <div className="p-10 space-y-8">
+              <div className="p-12 space-y-10">
                 <div className="flex items-center justify-between">
-                  <div className="space-y-1">
-                    <span className="text-[10px] font-black text-purple-600 uppercase tracking-[0.2em] block font-mono">Definição de Atributo</span>
-                    <h3 className="text-2xl font-black text-slate-900 tracking-tighter">Novo Campo Customizado</h3>
+                  <div className="space-y-2">
+                    <span className="text-technical text-purple-600 block">Dicionário Dinâmico</span>
+                    <h3 className="text-3xl font-black text-slate-900 tracking-tighter">Novo Campo Customizado</h3>
                   </div>
                   <button 
                     onClick={() => setCreatingForCol(null)}
-                    className="p-3 bg-slate-100 hover:bg-slate-200 text-slate-500 rounded-2xl transition-all active:scale-95"
+                    className="p-4 bg-slate-50 hover:bg-slate-100 text-slate-400 rounded-2xl transition-all"
                   >
-                    <X className="w-5 h-5" />
+                    <X className="w-6 h-6" />
                   </button>
                 </div>
 
-                <div className="space-y-4">
-                   <div className="p-4 bg-purple-50 border border-purple-100 rounded-2xl">
-                     <p className="text-[11px] text-purple-700 font-bold leading-relaxed italic text-pretty">
-                       &quot;Este campo será injetado no motor de normalização. Use nomes claros para identificadores ou perguntas de pesquisa.&quot;
+                <div className="space-y-8">
+                   <div className="p-6 bg-purple-50 rounded-2xl border border-purple-100">
+                     <p className="text-sm text-purple-800 font-medium leading-relaxed italic">
+                       &quot;Este campo será incorporado ao processamento. Use rótulos que facilitem a futura análise dos dados.&quot;
                      </p>
                    </div>
                    
                    <div className="space-y-6">
                       <div className="group">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2 block">Nome/Pergunta do Campo</label>
+                        <label className="text-technical text-slate-400 ml-2 mb-3 block">Rótulo / Pergunta da Coluna</label>
                         <input 
                           autoFocus
                           type="text"
-                          placeholder="Ex: Qual sua renda mensal?..."
+                          placeholder="Ex: Renda Mensal do Usuário..."
                           value={newLabel}
                           onChange={(e) => setNewLabel(e.target.value)}
                           onKeyDown={(e) => e.key === 'Enter' && handleCreateConfirm()}
-                          className="w-full bg-slate-50 border border-slate-200 rounded-[1.5rem] px-6 py-5 text-sm text-slate-800 font-bold focus:ring-4 focus:ring-purple-100 focus:border-purple-400 focus:bg-white outline-none transition-all placeholder:text-slate-300"
+                          className="w-full bg-slate-50 border border-slate-100 rounded-3xl px-8 py-5 text-base text-slate-900 font-bold focus:ring-4 focus:ring-purple-50 focus:border-purple-300 outline-none transition-all placeholder:text-slate-300"
                         />
                       </div>
 
                       <button 
                         onClick={handleCreateConfirm}
-                        className="w-full bg-gradient-to-r from-purple-700 to-indigo-600 hover:from-purple-800 hover:to-indigo-700 text-white py-5 rounded-[1.5rem] text-[11px] font-black uppercase tracking-[0.2em] shadow-xl shadow-purple-900/20 transition-all active:scale-95 flex items-center justify-center space-x-2"
+                        className="premium-button w-full py-6 rounded-3xl text-sm flex items-center justify-center space-x-3"
                       >
                         <Sparkles className="w-4 h-4" />
-                        <span>Registrar Campo</span>
+                        <span>Confirmar Inclusão</span>
                       </button>
                    </div>
                 </div>

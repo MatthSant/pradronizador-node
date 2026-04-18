@@ -1,18 +1,26 @@
 @import "tailwindcss";
 
 @theme {
-  --color-background: #f8f6ff;
-  --color-foreground: #1a0f33; /* Darkened from 2a1b4d for better contrast */
-  --color-primary: oklch(52% 0.22 285); /* Slightly darker/more saturated purple */
-  --color-accent: oklch(88% 0.1 280);
+  --color-background: #fbfaff;
+  --color-foreground: #0f172a;
+  --color-primary: oklch(62% 0.18 285);
+  --color-primary-deep: oklch(50% 0.22 285);
+  --color-accent: oklch(92% 0.04 280);
+  --color-emerald-clean: oklch(65% 0.15 160);
 }
 
 :root {
   color-scheme: light;
-  --background: #f8f6ff;
-  --foreground: #1a0f33; 
-  --primary: oklch(52% 0.22 285);
-  --primary-deep: oklch(40% 0.25 285);
+  --background: #fbfaff;
+  --foreground: #0f172a; 
+  --primary: oklch(62% 0.18 285);
+  --primary-deep: oklch(50% 0.22 285);
+  scroll-behavior: smooth;
+}
+
+::selection {
+  background: oklch(90% 0.1 285);
+  color: oklch(40% 0.2 285);
 }
 
 html, body {
@@ -20,55 +28,95 @@ html, body {
   color: var(--foreground) !important;
   margin: 0;
   min-height: 100vh;
+  position: relative;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0.03;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
 }
 
 body {
   font-family: 'Geist Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.015em;
+  overflow-x: hidden;
 }
 
-/* Enhanced Glassmorphism for better definition on light backgrounds */
+/* Premium Light Glassmorphism */
 .glass-card {
-  background: rgba(255, 255, 255, 0.9); /* Increased opacity from 0.82 */
-  backdrop-filter: blur(32px) saturate(250%);
-  border: 1px solid rgba(0, 0, 0, 0.12); /* Doubled border contrast from 0.06 */
+  background: rgba(255, 255, 255, 0.4); /* Much lighter, allows utility classes to show through */
+  backdrop-filter: blur(40px) saturate(200%);
+  border: 1px solid rgba(15, 23, 42, 0.06);
   box-shadow: 
-    0 4px 12px -2px rgba(28, 15, 51, 0.08),
-    0 12px 24px -4px rgba(28, 15, 51, 0.12);
+    0 1px 3px 0 rgba(0, 0, 0, 0.02),
+    0 20px 40px -12px rgba(15, 23, 42, 0.05);
   position: relative;
   overflow: hidden;
-}
-
-.glass-card::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
-  opacity: 0.03;
-  pointer-events: none;
-}
-
-.heading-accent {
-  color: var(--primary);
-  text-shadow: 0 1px 4px rgba(139, 92, 246, 0.1);
 }
 
 .premium-button {
   background: var(--primary);
   color: white;
   font-weight: 700;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-size: 11px;
+  transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 
+    0 4px 12px -2px oklch(62% 0.18 285 / 0.15),
+    0 20px 40px -10px oklch(62% 0.18 285 / 0.1);
 }
 
 .premium-button:hover {
-  transform: translateY(-1px);
+  transform: translateY(-4px) scale(1.02);
   background: var(--primary-deep);
-  box-shadow: 0 12px 32px -8px rgba(100, 50, 200, 0.4);
+  box-shadow: 
+    0 12px 24px -6px oklch(50% 0.22 285 / 0.2),
+    0 30px 60px -15px oklch(50% 0.22 285 / 0.15);
 }
 
 .premium-button:active {
-  transform: translateY(0);
-  scale: 0.98;
+  transform: translateY(0) scale(0.98);
+}
+
+.text-technical {
+  font-family: inherit;
+  font-weight: 900;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  font-size: 9px;
+  line-height: 1;
+  color: #64748b; /* Improved base contrast (slate-500) */
+}
+
+/* Custom Scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(15, 23, 42, 0.5); /* Maximum visibility set to 50% */
+  border-radius: 10px;
+  transition: all 0.3s ease;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(15, 23, 42, 0.7); /* Even darker on hover */
+}
+
+/* Ensure scrollbar area is visible on high-end screens */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(15, 23, 42, 0.5) transparent;
 }
