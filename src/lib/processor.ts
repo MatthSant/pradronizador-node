@@ -244,7 +244,7 @@ export async function extractFileHeaders(files: File[]): Promise<Record<string, 
                     allHeaders.add(cleanH);
                     if (!columnSamples[cleanH]) columnSamples[cleanH] = new Set();
                     
-                    rows.forEach(row => {
+                    rows.forEach((row: any) => {
                       const val = row[idx];
                       if (val !== undefined && val !== null && String(val).trim().length > 0) {
                         if (columnSamples[cleanH].size < 5) columnSamples[cleanH].add(String(val).trim());
@@ -274,7 +274,7 @@ export async function extractFileHeaders(files: File[]): Promise<Record<string, 
               allHeaders.add(cleanH);
               if (!columnSamples[cleanH]) columnSamples[cleanH] = new Set();
               
-              dataRows.forEach(row => {
+              dataRows.forEach((row: any) => {
                 const val = row[idx];
                 if (val !== undefined && val !== null && String(val).trim().length > 0) {
                   if (columnSamples[cleanH].size < 5) columnSamples[cleanH].add(String(val).trim());
