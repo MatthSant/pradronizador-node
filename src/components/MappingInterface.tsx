@@ -10,8 +10,6 @@ interface MappingInterfaceProps {
   sourceColumns: string[];
   type: string;
   customFieldLabels?: Record<string, string>;
-  onMappingChange: (mapping: Record<string, string>) => void;
-  onAddCustomField?: (label: string) => string;
 }
 
 export const MappingInterface: React.FC<MappingInterfaceProps> = ({ 
@@ -26,19 +24,21 @@ export const MappingInterface: React.FC<MappingInterfaceProps> = ({
   const [creatingForCol, setCreatingForCol] = useState<string | null>(null);
   const [newLabel, setNewLabel] = useState('');
   
-  const targetOptions = [
+  const targetOptions = React.useMemo(() => [
     { id: '__NONE__', name: '(Não Mapear)' },
     { id: '__SKIP__', name: '(Pular Campo)' },
     ...(onAddCustomField ? [{ id: '__CREATE__', name: '+ Criar Novo Campo Customizado...' }] : []),
-    ...Object.entries(FIELD_DESCRIPTIONS).map(([id, meta]) => ({
-      id,
-      name: `${meta.name}`
-    })),
+    ...Object.entries(FIELD_DESCRIPTIONS)
+      .filter(([_, meta]) => meta.category === 'global' || meta.category === type)
+      .map(([id, meta]) => ({
+        id,
+        name: `${meta.name}`
+      })),
     ...Object.entries(customFieldLabels).map(([id, label]) => ({
       id,
       name: `🟡 ${label}`
     }))
-  ];
+  ], [type, onAddCustomField, customFieldLabels]);
 
   useEffect(() => {
     const initialMappings: Record<string, string> = {};
