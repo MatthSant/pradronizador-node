@@ -1,0 +1,6 @@
+pandas
+openpyxl
+xlrd
+csv-parse
+iconv-lite
+framer-motion-py
