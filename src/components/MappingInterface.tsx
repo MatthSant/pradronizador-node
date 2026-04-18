@@ -3,27 +3,32 @@
 import React, { useState, useEffect } from 'react';
 import { FIELD_DESCRIPTIONS, HARD_MAPPINGS, UNIVERSAL_PRESETS, PLATFORM_PRESETS } from '@/lib/constants';
 import { normalizeString } from '@/lib/normalization';
-import { Check, AlertCircle, ChevronRight, Globe, FileStack } from 'lucide-react';
+import { Check, AlertCircle, ChevronRight, Globe, FileStack, Plus, X } from 'lucide-react';
 
 interface MappingInterfaceProps {
   sourceColumns: string[];
   type: string;
   customFieldLabels?: Record<string, string>;
   onMappingChange: (mapping: Record<string, string>) => void;
+  onAddCustomField?: (label: string) => string; // Returns the new key
 }
 
 export const MappingInterface: React.FC<MappingInterfaceProps> = ({ 
   sourceColumns, 
   type, 
   customFieldLabels = {}, 
-  onMappingChange 
+  onMappingChange,
+  onAddCustomField
 }) => {
   const [mappings, setMappings] = useState<Record<string, string>>({});
   const [unifiedMode, setUnifiedMode] = useState(true);
+  const [creatingForCol, setCreatingForCol] = useState<string | null>(null);
+  const [newLabel, setNewLabel] = useState('');
   
   const targetOptions = [
     { id: '__NONE__', name: '(Não Mapear)' },
     { id: '__SKIP__', name: '(Pular Campo)' },
+    ...(onAddCustomField ? [{ id: '__CREATE__', name: '+ Criar Novo Campo Customizado...' }] : []),
     ...Object.entries(FIELD_DESCRIPTIONS).map(([id, meta]) => ({
       id,
       name: `${meta.name} (${id})`
@@ -41,7 +46,6 @@ export const MappingInterface: React.FC<MappingInterfaceProps> = ({
     sourceColumns.forEach(col => {
       const norm = normalizeString(col);
       
-      // Order of precedence: Platform Preset -> Hard Mapping -> Universal Preset -> Fuzzy
       if (platformPreset[norm]) {
         initialMappings[col] = platformPreset[norm];
       } else if (HARD_MAPPINGS[col]) {
@@ -66,7 +70,20 @@ export const MappingInterface: React.FC<MappingInterfaceProps> = ({
   }, [mappings, onMappingChange]);
 
   const handleSelect = (source: string, target: string) => {
+    if (target === '__CREATE__') {
+      setCreatingForCol(source);
+      setNewLabel('');
+      return;
+    }
     setMappings(prev => ({ ...prev, [source]: target }));
+  };
+
+  const handleCreateConfirm = () => {
+    if (onAddCustomField && creatingForCol && newLabel.trim()) {
+      const newKey = onAddCustomField(newLabel.trim());
+      setMappings(prev => ({ ...prev, [creatingForCol]: newKey }));
+      setCreatingForCol(null);
+    }
   };
 
   return (
@@ -95,40 +112,70 @@ export const MappingInterface: React.FC<MappingInterfaceProps> = ({
 
       <div className="p-4 space-y-3 max-h-[500px] overflow-y-auto">
         {sourceColumns.map(col => (
-          <div key={col} className="flex items-center space-x-4 p-4 bg-slate-800/20 rounded-xl hover:bg-slate-800/40 transition-all border border-transparent hover:border-slate-700/50">
-            <div className="flex-1 min-w-0">
-              <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest mb-1 block">Origem</span>
-              <p className="text-sm font-bold truncate" title={col}>{col}</p>
-            </div>
-            
-            <div className="flex-shrink-0">
-              <ChevronRight className="w-5 h-5 text-slate-700" />
-            </div>
-            
-            <div className="flex-1 min-w-0">
-              <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest mb-1 block">Destino</span>
-              <select 
-                value={mappings[col] || '__NONE__'}
-                onChange={(e) => handleSelect(col, e.target.value)}
-                className="w-full bg-slate-900 border border-slate-700 rounded-lg text-xs font-medium px-2.5 py-2 focus:ring-2 focus:ring-indigo-500 outline-none transition-all appearance-none cursor-pointer"
-              >
-                {targetOptions.map(opt => (
-                  <option key={opt.id} value={opt.id} className="bg-slate-900 border-none">{opt.name}</option>
-                ))}
-              </select>
+          <div key={col} className="flex flex-col space-y-2 p-4 bg-slate-800/20 rounded-xl hover:bg-slate-800/40 transition-all border border-transparent hover:border-slate-700/50">
+            <div className="flex items-center space-x-4">
+              <div className="flex-1 min-w-0">
+                <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest mb-1 block">Origem</span>
+                <p className="text-sm font-bold truncate" title={col}>{col}</p>
+              </div>
+              
+              <div className="flex-shrink-0">
+                <ChevronRight className="w-5 h-5 text-slate-700" />
+              </div>
+              
+              <div className="flex-1 min-w-0">
+                <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest mb-1 block">Destino</span>
+                <select 
+                  value={mappings[col] || '__NONE__'}
+                  onChange={(e) => handleSelect(col, e.target.value)}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg text-xs font-medium px-2.5 py-2 focus:ring-2 focus:ring-indigo-500 outline-none transition-all appearance-none cursor-pointer"
+                >
+                  {targetOptions.map(opt => (
+                    <option key={opt.id} value={opt.id} className="bg-slate-900 border-none">{opt.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="w-8 flex justify-center">
+                {mappings[col] !== '__NONE__' && mappings[col] !== '__SKIP__' ? (
+                  <div className="p-1 bg-emerald-500/10 rounded-full">
+                    <Check className="w-5 h-5 text-emerald-500" />
+                  </div>
+                ) : (
+                  <div className="p-1 bg-slate-500/5 rounded-full">
+                    <AlertCircle className="w-5 h-5 text-slate-700" />
+                  </div>
+                )}
+              </div>
             </div>
 
-            <div className="w-8 flex justify-center">
-              {mappings[col] !== '__NONE__' && mappings[col] !== '__SKIP__' ? (
-                <div className="p-1 bg-emerald-500/10 rounded-full">
-                  <Check className="w-5 h-5 text-emerald-500" />
+            {creatingForCol === col && (
+              <div className="mt-3 p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg animate-in slide-in-from-top-2">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] font-black text-amber-500 uppercase">Novo Campo Customizado</span>
+                  <button onClick={() => setCreatingForCol(null)} className="p-1 hover:bg-amber-500/20 rounded-full">
+                    <X className="w-3 h-3 text-amber-500" />
+                  </button>
                 </div>
-              ) : (
-                <div className="p-1 bg-slate-500/5 rounded-full">
-                  <AlertCircle className="w-5 h-5 text-slate-700" />
+                <div className="flex space-x-2">
+                  <input 
+                    autoFocus
+                    type="text"
+                    placeholder="Pergunta da Pesquisa (ex: Qual sua dor?)"
+                    value={newLabel}
+                    onChange={(e) => setNewLabel(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleCreateConfirm()}
+                    className="flex-1 bg-slate-950 border border-amber-500/30 rounded-md px-3 py-1.5 text-xs text-white focus:ring-1 focus:ring-amber-500 outline-none"
+                  />
+                  <button 
+                    onClick={handleCreateConfirm}
+                    className="bg-amber-500 hover:bg-amber-600 text-black px-4 py-1.5 rounded-md text-xs font-bold transition-colors"
+                  >
+                    Confirmar
+                  </button>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         ))}
       </div>

@@ -5,7 +5,6 @@ import { useParams, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FileUpload } from '@/components/FileUpload';
 import { MappingInterface } from '@/components/MappingInterface';
-import { CustomFieldManager } from '@/components/CustomFieldManager';
 import { FixedValueInjector } from '@/components/FixedValueInjector';
 import { processFiles } from '@/lib/processor';
 import { ArrowLeft, Play, Download, CheckCircle2, ChevronRight, ChevronLeft } from 'lucide-react';
@@ -26,9 +25,7 @@ export default function ProcessorPage() {
   const isSurvey = type === 'survey';
 
   const sourceColumns = useMemo(() => {
-    // In a production app, we would sample the files here.
-    // Simplifying: extraction would happen when files are set.
-    return files.length > 0 ? ['Email', 'Nome', 'Telefone', 'Data da Transação', 'Status do Pedido', 'Campanha', 'Valor'] : [];
+    return files.length > 0 ? ['Email', 'Nome', 'Telefone', 'Data da Transação', 'Status do Pedido', 'Campanha', 'Valor', 'Pergunta Extra 1'] : [];
   }, [files]);
 
   const customFieldLabels = useMemo(() => {
@@ -39,12 +36,19 @@ export default function ProcessorPage() {
     return labels;
   }, [customFields]);
 
+  const handleAddCustomField = (label: string) => {
+    const nextIdx = customFields.length + 1;
+    const newKey = `custom_field_${nextIdx}`;
+    setCustomFields(prev => [...prev, { key: newKey, label }]);
+    return newKey;
+  };
+
   const handleProcess = async () => {
     setIsProcessing(true);
     try {
       const resp = await processFiles(files, mappings, fixedValues, type as string);
       setResult(resp);
-      setStep(isSurvey ? 5 : 4); // Jump to result
+      setStep(4); // Jump to result
     } catch (err) {
       alert('Erro ao processar arquivos.');
       console.error(err);
@@ -55,13 +59,10 @@ export default function ProcessorPage() {
 
   const steps = [
     { id: 1, name: 'Upload' },
-    ...(isSurvey ? [{ id: 2, name: 'Dicionário' }] : []),
-    { id: isSurvey ? 3 : 2, name: 'Mapeamento' },
-    { id: isSurvey ? 4 : 3, name: 'Tags Fixas' },
-    { id: isSurvey ? 5 : 4, name: 'Resultado' }
+    { id: 2, name: 'Mapeamento' },
+    { id: 3, name: 'Tags Fixas' },
+    { id: 4, name: 'Resultado' }
   ];
-
-  const currentStepData = steps.find(s => s.id === step);
 
   const nextStep = () => setStep(prev => prev + 1);
   const prevStep = () => setStep(prev => prev - 1);
@@ -114,27 +115,14 @@ export default function ProcessorPage() {
           </motion.div>
         )}
 
-        {isSurvey && step === 2 && (
-          <motion.div key="step-2-survey" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-8">
-            <CustomFieldManager fields={customFields} onChange={setCustomFields} />
-            <div className="flex justify-between items-center pt-4">
-              <button onClick={prevStep} className="px-8 py-4 rounded-2xl font-bold text-sm text-slate-400 hover:text-white transition-colors flex items-center">
-                <ChevronLeft className="mr-2 w-5 h-5" /> Voltar
-              </button>
-              <button onClick={nextStep} className="premium-button px-10 py-4 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center">
-                Seguir para Mapeamento <ChevronRight className="ml-2 w-5 h-5" />
-              </button>
-            </div>
-          </motion.div>
-        )}
-
-        {step === (isSurvey ? 3 : 2) && (
+        {step === 2 && (
           <motion.div key="step-mapping" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-8">
             <MappingInterface 
               sourceColumns={sourceColumns} 
               type={type as string}
               customFieldLabels={customFieldLabels}
               onMappingChange={setMappings} 
+              onAddCustomField={isSurvey ? handleAddCustomField : undefined}
             />
             <div className="flex justify-between items-center pt-4">
               <button onClick={prevStep} className="px-8 py-4 rounded-2xl font-bold text-sm text-slate-400 hover:text-white transition-colors flex items-center">
@@ -147,7 +135,7 @@ export default function ProcessorPage() {
           </motion.div>
         )}
 
-        {step === (isSurvey ? 4 : 3) && (
+        {step === 3 && (
           <motion.div key="step-fixed" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-8">
             <FixedValueInjector 
               unmappedTargets={Object.keys(require('@/lib/constants').FIELD_DESCRIPTIONS).filter(t => !Object.values(mappings).includes(t))}
@@ -169,7 +157,7 @@ export default function ProcessorPage() {
           </motion.div>
         )}
 
-        {step === (isSurvey ? 5 : 4) && (
+        {step === 4 && (
           <motion.div 
             key="step-result"
             initial={{ opacity: 0, scale: 0.95 }}
