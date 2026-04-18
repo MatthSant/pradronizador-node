@@ -6,9 +6,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { FileUpload } from '@/components/FileUpload';
 import { MappingInterface } from '@/components/MappingInterface';
 import { MappingReview } from '@/components/MappingReview';
+import { StatusNormalizer } from '@/components/StatusNormalizer';
 import { FixedValueInjector } from '@/components/FixedValueInjector';
-import { processFiles, extractFileHeaders } from '@/lib/processor';
-import { ArrowLeft, Play, Download, CheckCircle2, ChevronRight, ChevronLeft, Layers, Loader2, Sparkles } from 'lucide-react';
+import { processFiles, extractFileHeaders, discoverUniqueStatuses } from '@/lib/processor';
+import { ArrowLeft, Play, Download, CheckCircle2, ChevronRight, ChevronLeft, Layers, Loader2, Sparkles, ShieldCheck } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 export default function ProcessorPage() {
@@ -21,6 +22,9 @@ export default function ProcessorPage() {
   const [activeMappingFileIdx, setActiveMappingFileIdx] = useState(0);
   const [mappings, setMappings] = useState<Record<string, Record<string, string>>>({}); // fileName -> mappings
   const [customFields, setCustomFields] = useState<{key: string, label: string}[]>([]);
+  const [statusMappings, setStatusMappings] = useState<Record<string, string>>({});
+  const [discoveredStatuses, setDiscoveredStatuses] = useState<string[]>([]);
+  const [isDiscoveringStatuses, setIsDiscoveringStatuses] = useState(false);
   const [fixedValues, setFixedValues] = useState<Record<string, Record<string, string>>>({});
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingStatus, setProcessingStatus] = useState({ current: 0, total: 0, fileName: '' });
@@ -28,6 +32,7 @@ export default function ProcessorPage() {
   const [result, setResult] = useState<any>(null);
 
   const isSurvey = type === 'survey';
+  const isTransaction = type === 'transactions';
 
   const handleFilesSelected = async (selectedFiles: File[]) => {
     setFiles(selectedFiles);
@@ -87,6 +92,21 @@ export default function ProcessorPage() {
     return newKey;
   }, [customFields.length]);
 
+  const handleStartStatusDiscovery = async () => {
+    setIsDiscoveringStatuses(true);
+    try {
+      const statuses = await discoverUniqueStatuses(files, mappings, type as string);
+      setDiscoveredStatuses(statuses);
+      setStep(3);
+    } catch (err) {
+      console.error(err);
+      alert('Erro ao analisar status.');
+      setStep(4); // Fallback to review
+    } finally {
+      setIsDiscoveringStatuses(false);
+    }
+  };
+
   const handleProcess = async () => {
     setIsProcessing(true);
     setProcessingStatus({ current: 0, total: files.length, fileName: 'Iniciando...' });
@@ -104,10 +124,11 @@ export default function ProcessorPage() {
           setProcessingStatus({ fileName, current, total });
           // Force a tiny gap for React to render the progress update
           await new Promise(r => setTimeout(r, 10));
-        }
+        },
+        statusMappings
       );
       setResult(resp);
-      setStep(5);
+      setStep(6);
     } catch (err) {
       alert('Erro ao processar arquivos.');
       console.error(err);
@@ -144,9 +165,10 @@ export default function ProcessorPage() {
   const steps = [
     { id: 1, name: 'Upload' },
     { id: 2, name: 'Mapeamento' },
-    { id: 3, name: 'Revisão' },
-    { id: 4, name: 'Tags Fixas' },
-    { id: 5, name: 'Conclusão' }
+    ...(isTransaction ? [{ id: 3, name: 'Normalização' }] : []),
+    { id: 4, name: 'Revisão' },
+    { id: 5, name: 'Tags Fixas' },
+    { id: 6, name: 'Conclusão' }
   ];
 
   const nextStep = () => setStep(prev => prev + 1);
@@ -343,13 +365,20 @@ export default function ProcessorPage() {
                 
                 <button 
                   onClick={() => {
-                    if (activeMappingFileIdx < files.length - 1) setActiveMappingFileIdx(prev => prev + 1);
-                    else nextStep();
+                    if (activeMappingFileIdx < files.length - 1) {
+                      setActiveMappingFileIdx(prev => prev + 1);
+                    } else if (isTransaction) {
+                      handleStartStatusDiscovery();
+                    } else {
+                      setStep(4);
+                    }
                   }}
                   className="premium-button px-12 py-5 rounded-2xl text-[11px] uppercase tracking-[0.25em] flex items-center transition-all"
                 >
                   {activeMappingFileIdx < files.length - 1 ? (
                     <>Próximo Arquivo <ChevronRight className="ml-3 w-5 h-5" /></>
+                  ) : isTransaction ? (
+                    <>Sincronia de Status <ChevronRight className="ml-3 w-5 h-5" /></>
                   ) : (
                     <>Auditoria de Dados <ChevronRight className="ml-3 w-5 h-5" /></>
                   )}
@@ -358,7 +387,25 @@ export default function ProcessorPage() {
             </div>
           )}
 
-          {step === 3 && (
+          {step === 3 && isTransaction && (
+            <div className="space-y-10">
+              <StatusNormalizer 
+                discoveredStatuses={discoveredStatuses}
+                mappings={statusMappings}
+                onChange={setStatusMappings}
+              />
+              <div className="flex flex-col md:flex-row justify-between items-center gap-6">
+                <button onClick={() => setStep(2)} className="px-8 py-5 rounded-2xl font-black text-[10px] uppercase tracking-widest text-slate-600 hover:text-slate-900 transition-colors flex items-center">
+                  <ChevronLeft className="mr-3 w-4 h-4" /> Voltar ao Mapeamento
+                </button>
+                <button onClick={() => setStep(4)} className="premium-button px-12 py-5 rounded-2xl text-[11px] uppercase tracking-[0.25em] flex items-center transition-all">
+                  Auditoria de Dados <ChevronRight className="ml-3 w-5 h-5" />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {step === 4 && (
             <div className="space-y-10">
               <MappingReview 
                 mappings={mappings}
@@ -367,8 +414,8 @@ export default function ProcessorPage() {
                 customFieldLabels={customFieldLabels}
               />
               <div className="flex flex-col md:flex-row justify-between items-center gap-6">
-                <button onClick={prevStep} className="px-8 py-5 rounded-2xl font-black text-[10px] uppercase tracking-widest text-slate-600 hover:text-slate-900 transition-colors flex items-center">
-                  <ChevronLeft className="mr-3 w-4 h-4" /> Voltar ao Mapeamento
+                <button onClick={() => setStep(isTransaction ? 3 : 2)} className="px-8 py-5 rounded-2xl font-black text-[10px] uppercase tracking-widest text-slate-600 hover:text-slate-900 transition-colors flex items-center">
+                  <ChevronLeft className="mr-3 w-4 h-4" /> Voltar
                 </button>
                 <button onClick={nextStep} className="premium-button px-12 py-5 rounded-2xl text-[11px] uppercase tracking-[0.25em] flex items-center transition-all">
                   Avançar para Tags Fixas <ChevronRight className="ml-3 w-5 h-5" />
@@ -377,7 +424,7 @@ export default function ProcessorPage() {
             </div>
           )}
 
-          {step === 4 && (
+          {step === 5 && (
             <div className="space-y-10">
               <FixedValueInjector 
                 files={files}
@@ -387,7 +434,7 @@ export default function ProcessorPage() {
               />
               <div className="flex flex-col md:flex-row justify-between items-center gap-6">
                 <button onClick={prevStep} className="px-8 py-5 rounded-2xl font-black text-[10px] uppercase tracking-widest text-slate-600 hover:text-slate-900 transition-colors flex items-center">
-                  <ChevronLeft className="mr-3 w-4 h-4" /> Voltar ao Mapeamento
+                  <ChevronLeft className="mr-3 w-4 h-4" /> Voltar
                 </button>
                 <button 
                   onClick={handleProcess}
@@ -403,7 +450,7 @@ export default function ProcessorPage() {
             </div>
           )}
 
-          {step === 5 && (
+          {step === 6 && (
             <div className="space-y-10">
               <div className="flex flex-col items-center justify-center py-12 glass-card text-center space-y-6 bg-emerald-50/[0.05] border-emerald-200">
                 <div className="relative">

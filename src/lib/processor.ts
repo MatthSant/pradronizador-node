@@ -35,7 +35,8 @@ export async function processFiles(
   mappings: Record<string, Record<string, string>>, // Key: filename, Value: { sourceCol: targetAttr }
   fixedValues: Record<string, Record<string, string>>, // Key: filename, Value: { targetAttr: value }
   type: string,
-  onProgress?: (filename: string, index: number, total: number) => void
+  onProgress?: (filename: string, index: number, total: number) => void,
+  statusMappings?: Record<string, string> // New: manual status overrrides
 ): Promise<ProcessingResult> {
   let combinedData: any[] = [];
   let logs: { arquivo: string; origem: string; destino: string; status: 'MAPEADO' | 'DESCARTADO' | 'INJETADO' }[] = [];
@@ -119,7 +120,17 @@ export async function processFiles(
         if (value !== null) {
           value = cleanSurrogates(value);
           if (target === "field_email") value = cleanEmail(String(value));
-          if (target === "field_transaction_status" || target === "field_status") value = mapStatus(String(value));
+          
+          // STATUS NORMALIZATION LOGIC
+          if (target === "field_transaction_status" || target === "field_status") {
+            const rawStatus = String(value).trim();
+            // Use manual mapping if provided, else fallback to automatic logic
+            if (statusMappings && statusMappings[rawStatus]) {
+              value = statusMappings[rawStatus];
+            } else {
+              value = mapStatus(rawStatus);
+            }
+          }
           
           if (target === "data" || target.includes("_date") || target === "created_at") {
             value = normalizeDate(value);
@@ -144,6 +155,69 @@ export async function processFiles(
   }
 
   return { data: combinedData, logs };
+}
+
+/**
+ * Scans all provided files to find unique values in the column(s) mapped to status.
+ */
+export async function discoverUniqueStatuses(
+  files: File[],
+  mappings: Record<string, Record<string, string>>,
+  type: string
+): Promise<string[]> {
+  const uniqueStatuses = new Set<string>();
+  if (type !== 'transactions') return [];
+
+  for (const file of files) {
+    const fileMappings = mappings[file.name] || {};
+    const statusCols = Object.entries(fileMappings)
+      .filter(([_, target]) => target === 'field_transaction_status' || target === 'field_status')
+      .map(([source, _]) => source);
+
+    if (statusCols.length === 0) continue;
+
+    try {
+      if (file.name.toLowerCase().endsWith(".csv")) {
+        await new Promise<void>((resolve) => {
+          Papa.parse(file, {
+            header: true,
+            skipEmptyLines: true,
+            step: (results) => {
+              const row = results.data as any;
+              statusCols.forEach(col => {
+                const val = row[col];
+                if (val !== undefined && val !== null && String(val).trim().length > 0) {
+                  uniqueStatuses.add(String(val).trim());
+                }
+              });
+            },
+            complete: () => {
+              resolve();
+            }
+          });
+        });
+      } else {
+        const buffer = await file.arrayBuffer();
+        const workbook = XLSX.read(buffer, { type: "array" });
+        const firstSheetName = workbook.SheetNames[0];
+        const firstSheet = workbook.Sheets[firstSheetName];
+        const rows = XLSX.utils.sheet_to_json(firstSheet) as any[];
+        
+        rows.forEach(row => {
+          statusCols.forEach(col => {
+            const val = row[col];
+            if (val !== undefined && val !== null && String(val).trim().length > 0) {
+              uniqueStatuses.add(String(val).trim());
+            }
+          });
+        });
+      }
+    } catch (e) {
+      console.error(`Error scanning statuses in ${file.name}:`, e);
+    }
+  }
+
+  return Array.from(uniqueStatuses).sort();
 }
 
 export async function extractFileHeaders(files: File[]): Promise<Record<string, { headers: string[], samples: Record<string, string[]> }>> {

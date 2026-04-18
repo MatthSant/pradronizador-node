@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { FIELD_DESCRIPTIONS, HARD_MAPPINGS } from '@/lib/constants';
-import { Check, AlertCircle, ChevronRight, FileStack, X, Sparkles, Ban, ListFilter, Trash2, RotateCcw, Info, Loader2 } from 'lucide-react';
+import { Check, AlertCircle, ChevronRight, FileStack, X, Sparkles, Ban, ListFilter, Trash2, RotateCcw, Info, CheckCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface MappingInterfaceProps {
@@ -54,56 +54,40 @@ export const MappingInterface: React.FC<MappingInterfaceProps> = ({
     return Array.from(new Set(sourceColumns.filter(c => c && c.trim().length > 0)));
   }, [sourceColumns]);
 
-  // Initialization: Zero-Guess strategy as requested
   useEffect(() => {
     const initialMappingsPreserved: Record<string, string> = {};
-
     sourceColumns.forEach(col => {
-      // 1. Preserve existing manual mappings from parent state if any
       if (initialMappings[col] && initialMappings[col] !== '__NONE__') {
         initialMappingsPreserved[col] = initialMappings[col];
         return;
       }
-
-      // 2. Exact Match for Hotmart Standard (Only for Transactions)
       if (type === 'transactions' && HARD_MAPPINGS[col]) {
         initialMappingsPreserved[col] = HARD_MAPPINGS[col];
         return;
       }
-
-      // 3. Default to NONE to avoid incorrect guessing
       initialMappingsPreserved[col] = '__NONE__';
     });
-    
     setMappings(initialMappingsPreserved);
-  }, [sourceColumns, type]); 
+  }, [activeFileName, sourceColumns, type]); 
 
   const groups = useMemo(() => {
     const pending: string[] = [];
     const mapped: string[] = [];
     const skipped: string[] = [];
-
     safeSourceColumns.forEach(col => {
       const target = mappings[col];
-      if (target === '__SKIP__') {
-        skipped.push(col);
-      } else if (!target || target === '__NONE__') {
-        pending.push(col);
-      } else {
-        mapped.push(col);
-      }
+      if (target === '__SKIP__') skipped.push(col);
+      else if (!target || target === '__NONE__') pending.push(col);
+      else mapped.push(col);
     });
-
     return { pending, mapped, skipped };
   }, [safeSourceColumns, mappings]);
 
   const applyHotmartPreset = () => {
     const newMappings = { ...mappings };
     safeSourceColumns.forEach(col => {
-      // Only overwrite if currently not mapped or explicitly none
-      if ((!newMappings[col] || newMappings[col] === '__NONE__') && HARD_MAPPINGS[col]) {
-        newMappings[col] = HARD_MAPPINGS[col];
-      }
+      if (HARD_MAPPINGS[col]) newMappings[col] = HARD_MAPPINGS[col];
+      else if (!newMappings[col] || newMappings[col] === '__NONE__') newMappings[col] = '__SKIP__';
     });
     setMappings(newMappings);
   };
@@ -154,14 +138,8 @@ export const MappingInterface: React.FC<MappingInterfaceProps> = ({
       <div className="flex items-center justify-between gap-6">
         <div className="flex-1 min-w-0 flex flex-col items-start relative">
           <div className="flex items-center space-x-2 mb-1.5 h-4">
-            <span className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] block font-mono">Input Header</span>
-            <button 
-              onMouseEnter={() => setHoveredCol(col)}
-              onMouseLeave={() => setHoveredCol(null)}
-              className="p-0.5 rounded-full hover:bg-purple-100 text-slate-400 hover:text-purple-600 transition-all cursor-help"
-            >
-              <Info className="w-3 h-3" />
-            </button>
+            <span className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] block font-mono">Header do Arquivo</span>
+            <Info className="w-3 h-3 text-slate-400" />
           </div>
           <p className="text-sm font-black text-slate-800 break-words leading-tight" title={col}>{col}</p>
 
@@ -201,11 +179,13 @@ export const MappingInterface: React.FC<MappingInterfaceProps> = ({
         
         <div className="flex-1 min-w-0 flex items-center space-x-2">
           <div className="flex-1">
-            <span className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] mb-1.5 block font-mono">Sync Target</span>
+            <span className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] mb-1.5 block font-mono">Alvo de Sincronia</span>
             <select 
               disabled={mappings[col] === '__SKIP__'}
               value={mappings[col] === '__SKIP__' ? '__NONE__' : (mappings[col] || '__NONE__')}
               onChange={(e) => handleSelect(col, e.target.value)}
+              onMouseEnter={() => setHoveredCol(col)}
+              onMouseLeave={() => setHoveredCol(null)}
               className="w-full bg-white border border-slate-300 rounded-xl text-[10px] font-black uppercase tracking-wider px-3 py-2.5 focus:ring-2 focus:ring-purple-200 outline-none transition-all appearance-none cursor-pointer hover:border-purple-400 text-slate-800 disabled:bg-slate-100 disabled:cursor-not-allowed"
             >
               {targetOptions.map(opt => (
@@ -230,9 +210,7 @@ export const MappingInterface: React.FC<MappingInterfaceProps> = ({
             </button>
 
             <div className="w-8 flex justify-center">
-              {mappings[col] === '__SKIP__' ? (
-                null
-              ) : mappings[col] !== '__NONE__' ? (
+              {mappings[col] === '__SKIP__' ? null : mappings[col] !== '__NONE__' ? (
                 <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="p-1.5 bg-emerald-100 rounded-full border border-emerald-400">
                   <Check className="w-4 h-4 text-emerald-700" />
                 </motion.div>
@@ -245,44 +223,11 @@ export const MappingInterface: React.FC<MappingInterfaceProps> = ({
           </div>
         </div>
       </div>
-
-      {creatingForCol === col && (
-        <motion.div 
-          initial={{ opacity: 0, height: 0 }} 
-          animate={{ opacity: 1, height: 'auto' }}
-          className="p-5 bg-purple-50 border border-purple-300 rounded-xl space-y-4"
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-black text-purple-800 uppercase tracking-widest">Definição de Campo Customizado</span>
-            <button onClick={() => setCreatingForCol(null)} className="p-1.5 hover:bg-purple-200 rounded-lg transition-colors">
-              <X className="w-4 h-4 text-purple-800" />
-            </button>
-          </div>
-          <div className="flex gap-3">
-            <input 
-              autoFocus
-              type="text"
-              placeholder="Identificador ou Pergunta da Pesquisa..."
-              value={newLabel}
-              onChange={(e) => setNewLabel(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleCreateConfirm()}
-              className="flex-1 bg-white border border-purple-300 rounded-xl px-4 py-3 text-xs text-slate-800 font-medium focus:ring-2 focus:ring-purple-300 outline-none placeholder:text-slate-400"
-            />
-            <button 
-              onClick={handleCreateConfirm}
-              className="bg-purple-700 hover:bg-purple-800 text-white px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 shadow-lg shadow-purple-700/20"
-            >
-              Registrar
-            </button>
-          </div>
-        </motion.div>
-      )}
     </motion.div>
   );
 
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
-      {/* HEADER: PROGRESS & CONTEXT */}
       <div className="glass-card mb-8 p-10 bg-slate-900 border-white/[0.1] relative overflow-hidden group shadow-2xl shadow-purple-900/10">
         <div className="absolute top-0 right-0 p-12 opacity-5 group-hover:opacity-10 transition-opacity">
           <FileStack className="w-48 h-48 text-white" />
@@ -312,34 +257,36 @@ export const MappingInterface: React.FC<MappingInterfaceProps> = ({
             )}
           </div>
           <div className="space-y-1">
-            <h2 className="text-4xl font-black text-white tracking-tighter leading-tight">
+            <h2 className="text-4xl font-black text-white tracking-tighter leading-tight text-balance">
               Mapeando <span className="text-purple-400 italic">"{activeFileName}"</span>
             </h2>
-            <p className="text-slate-400 text-sm font-medium max-w-2xl">Mapeamento granular por arquivo. A inteligência "Zero-Guess" agora aguarda seu comando ou vinculação exata.</p>
+            <p className="text-slate-400 text-sm font-medium max-w-2xl text-pretty">
+              Conecte os cabeçalhos do seu arquivo aos campos padronizados do sistema. Use campos customizados para capturar perguntas específicas de pesquisas.
+            </p>
           </div>
         </div>
       </div>
 
-      {/* QUICK STATS ROW */}
-      <div className="flex flex-wrap gap-4 mb-4">
-        <div className="px-5 py-3 bg-white border border-slate-200 rounded-2xl shadow-sm flex items-center space-x-3">
-          <ListFilter className="w-4 h-4 text-slate-400" />
-          <span className="text-xs font-black uppercase tracking-widest text-slate-700 font-mono">
-            Sincronia: {groups.mapped.length}/{safeSourceColumns.length - groups.skipped.length}
-          </span>
-        </div>
-        {groups.pending.length > 0 && (
-          <div className="px-5 py-3 bg-amber-50 border border-amber-200 rounded-2xl shadow-sm flex items-center space-x-3">
-            <AlertCircle className="w-4 h-4 text-amber-600 animate-pulse" />
-            <span className="text-xs font-black uppercase tracking-widest text-amber-700 font-mono">
-              Pendente: {groups.pending.length}
+      <div className="flex flex-wrap gap-4 mb-4 items-center justify-between">
+        <div className="flex gap-4">
+          <div className="px-5 py-3 bg-white border border-slate-200 rounded-2xl shadow-sm flex items-center space-x-3">
+            <ListFilter className="w-4 h-4 text-slate-400" />
+            <span className="text-xs font-black uppercase tracking-widest text-slate-700 font-mono">
+              Status: {groups.mapped.length}/{safeSourceColumns.length - groups.skipped.length} Sincronizados
             </span>
           </div>
-        )}
+          {groups.pending.length > 0 && (
+            <div className="px-5 py-3 bg-amber-50 border border-amber-200 rounded-2xl shadow-sm flex items-center space-x-3">
+              <AlertCircle className="w-4 h-4 text-amber-600 animate-pulse" />
+              <span className="text-xs font-black uppercase tracking-widest text-amber-700 font-mono">
+                Pendente: {groups.pending.length}
+              </span>
+            </div>
+          )}
+        </div>
       </div>
 
       <AnimatePresence mode="popLayout">
-        {/* SECTION 1: PENDING (URGENTE) */}
         {groups.pending.length > 0 && (
           <motion.div 
             key="section-pending"
@@ -352,7 +299,7 @@ export const MappingInterface: React.FC<MappingInterfaceProps> = ({
             <div className="px-8 py-5 bg-amber-50 border-b border-amber-100 flex items-center justify-between">
               <div className="flex items-center space-x-3 text-amber-700">
                 <AlertCircle className="w-5 h-5 animate-pulse" />
-                <h4 className="text-sm font-black uppercase tracking-[0.2em] font-mono italic">Faltam Mapear ({groups.pending.length})</h4>
+                <h4 className="text-sm font-black uppercase tracking-[0.2em] font-mono italic text-pretty">Faltam Mapear ({groups.pending.length})</h4>
               </div>
             </div>
             <div className="p-8 space-y-4 max-h-[500px] overflow-y-auto custom-scrollbar">
@@ -361,9 +308,7 @@ export const MappingInterface: React.FC<MappingInterfaceProps> = ({
           </motion.div>
         )}
 
-        {/* ROW 2: SIDE BY SIDE GRID FOR MAPPED AND SKIPPED */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* SECTION 2: MAPPED */}
           {groups.mapped.length > 0 && (
             <motion.div 
               key="section-mapped"
@@ -376,7 +321,7 @@ export const MappingInterface: React.FC<MappingInterfaceProps> = ({
               <div className="px-8 py-5 bg-emerald-50 border-b border-emerald-100 flex items-center justify-between">
                 <div className="flex items-center space-x-3 text-emerald-700">
                   <CheckCircle className="w-5 h-5" />
-                  <h4 className="text-sm font-black uppercase tracking-[0.2em] font-mono italic">Sincronizados ({groups.mapped.length})</h4>
+                  <h4 className="text-sm font-black uppercase tracking-[0.2em] font-mono italic text-pretty">Sincronizados ({groups.mapped.length})</h4>
                 </div>
               </div>
               <div className="p-6 space-y-4 max-h-[500px] overflow-y-auto custom-scrollbar">
@@ -385,7 +330,6 @@ export const MappingInterface: React.FC<MappingInterfaceProps> = ({
             </motion.div>
           )}
 
-          {/* SECTION 3: SKIPPED */}
           {groups.skipped.length > 0 && (
             <motion.div 
               key="section-skipped"
@@ -398,7 +342,7 @@ export const MappingInterface: React.FC<MappingInterfaceProps> = ({
               <div className="px-8 py-5 bg-slate-100 border-b border-slate-200 flex items-center justify-between">
                 <div className="flex items-center space-x-3 text-slate-500">
                   <Ban className="w-5 h-5" />
-                  <h4 className="text-sm font-black uppercase tracking-[0.2em] font-mono italic">Descartados ({groups.skipped.length})</h4>
+                  <h4 className="text-sm font-black uppercase tracking-[0.2em] font-mono italic text-pretty">Descartados ({groups.skipped.length})</h4>
                 </div>
               </div>
               <div className="p-6 space-y-4 max-h-[500px] overflow-y-auto custom-scrollbar grayscale opacity-80">
@@ -407,6 +351,72 @@ export const MappingInterface: React.FC<MappingInterfaceProps> = ({
             </motion.div>
           )}
         </div>
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {creatingForCol && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setCreatingForCol(null)}
+              className="absolute inset-0 bg-slate-900/60 backdrop-blur-md"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-xl bg-white rounded-[2.5rem] shadow-2xl border border-white overflow-hidden"
+            >
+              <div className="p-10 space-y-8">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-black text-purple-600 uppercase tracking-[0.2em] block font-mono">Definição de Atributo</span>
+                    <h3 className="text-2xl font-black text-slate-900 tracking-tighter">Novo Campo Customizado</h3>
+                  </div>
+                  <button 
+                    onClick={() => setCreatingForCol(null)}
+                    className="p-3 bg-slate-100 hover:bg-slate-200 text-slate-500 rounded-2xl transition-all active:scale-95"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="space-y-4">
+                   <div className="p-4 bg-purple-50 border border-purple-100 rounded-2xl">
+                     <p className="text-[11px] text-purple-700 font-bold leading-relaxed italic text-pretty">
+                       &quot;Este campo será injetado no motor de normalização. Use nomes claros para identificadores ou perguntas de pesquisa.&quot;
+                     </p>
+                   </div>
+                   
+                   <div className="space-y-6">
+                      <div className="group">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2 block">Nome/Pergunta do Campo</label>
+                        <input 
+                          autoFocus
+                          type="text"
+                          placeholder="Ex: Qual sua renda mensal?..."
+                          value={newLabel}
+                          onChange={(e) => setNewLabel(e.target.value)}
+                          onKeyDown={(e) => e.key === 'Enter' && handleCreateConfirm()}
+                          className="w-full bg-slate-50 border border-slate-200 rounded-[1.5rem] px-6 py-5 text-sm text-slate-800 font-bold focus:ring-4 focus:ring-purple-100 focus:border-purple-400 focus:bg-white outline-none transition-all placeholder:text-slate-300"
+                        />
+                      </div>
+
+                      <button 
+                        onClick={handleCreateConfirm}
+                        className="w-full bg-gradient-to-r from-purple-700 to-indigo-600 hover:from-purple-800 hover:to-indigo-700 text-white py-5 rounded-[1.5rem] text-[11px] font-black uppercase tracking-[0.2em] shadow-xl shadow-purple-900/20 transition-all active:scale-95 flex items-center justify-center space-x-2"
+                      >
+                        <Sparkles className="w-4 h-4" />
+                        <span>Registrar Campo</span>
+                      </button>
+                   </div>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
       </AnimatePresence>
     </div>
   );

@@ -41,6 +41,10 @@ export const MappingReview: React.FC<MappingReviewProps> = ({ mappings, perFileD
       .filter(([key, meta]) => {
         const isMandatory = meta.name.includes('(Obrigatório)');
         if (!isMandatory) return false;
+
+        // In transactions, 'field_transaction_date' is the mandatory date field,
+        // so we don't require the global 'data' field.
+        if (type === 'transactions' && key === 'data') return false;
         
         const isGlobal = meta.category === 'global';
         const isTypeSpecific = meta.category === type;
