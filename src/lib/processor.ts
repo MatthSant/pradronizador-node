@@ -1,10 +1,28 @@
 import * as XLSX from "xlsx";
-import { parse } from "csv-parse/browser/esm/sync";
+import Papa from "papaparse";
 import { cleanEmail, mapStatus, cleanSurrogates } from "./normalization";
 
 export interface ProcessingResult {
   data: any[];
   logs: { arquivo: string; origem: string; destino: string }[];
+}
+
+// Helper to parse CSV using PapaParse (more robust for browser/large files)
+function parseCsv(file: File, options: any): Promise<any[]> {
+  return new Promise((resolve, reject) => {
+    Papa.parse(file, {
+      ...options,
+      header: options.columns === true,
+      skipEmptyLines: options.skip_empty_lines || true,
+      transformHeader: (h) => h.trim(),
+      complete: (results) => {
+        resolve(results.data);
+      },
+      error: (err) => {
+        reject(err);
+      }
+    });
+  });
 }
 
 export async function processFiles(
@@ -31,21 +49,20 @@ export async function processFiles(
   ]));
 
   for (const file of files) {
-    const buffer = await file.arrayBuffer();
     let rawData: any[] = [];
 
     try {
       if (file.name.toLowerCase().endsWith(".csv")) {
-        const text = new TextDecoder("utf-8", { fatal: false }).decode(buffer);
-        rawData = parse(text, {
+        // PapaParse handles the File object directly (streaming from disk)
+        rawData = await parseCsv(file, {
           columns: true,
           skip_empty_lines: true,
-          trim: true,
-          relax_column_count: true,
         });
       } else {
+        const buffer = await file.arrayBuffer();
         const workbook = XLSX.read(buffer, { type: "array" });
-        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+        const firstSheetName = workbook.SheetNames[0];
+        const firstSheet = workbook.Sheets[firstSheetName];
         rawData = XLSX.utils.sheet_to_json(firstSheet);
       }
     } catch (e) {
@@ -104,21 +121,24 @@ export async function extractFileHeaders(files: File[]): Promise<string[]> {
 
   for (const file of files) {
     try {
-      const buffer = await file.arrayBuffer();
-      
       if (file.name.toLowerCase().endsWith(".csv")) {
-        const text = new TextDecoder("utf-8", { fatal: false }).decode(buffer);
-        // Only parse the headers (first row)
-        const rawData = parse(text, {
-          to: 1, // Only read first line
-          columns: false,
-          skip_empty_lines: true,
-          trim: true,
+        // Extract headers using PapaParse (reads only the beginning of the file)
+        const headers = await new Promise<string[]>((resolve) => {
+          Papa.parse(file, {
+            preview: 1, // Read only the first row
+            header: false,
+            complete: (results) => {
+              if (results.data && results.data.length > 0) {
+                resolve(results.data[0] as string[]);
+              } else {
+                resolve([]);
+              }
+            }
+          });
         });
-        if (rawData && rawData.length > 0) {
-          rawData[0].forEach((h: string) => allHeaders.add(h));
-        }
+        headers.forEach(h => allHeaders.add(h.trim()));
       } else {
+        const buffer = await file.arrayBuffer();
         // Read only the first row for performance
         const workbook = XLSX.read(buffer, { type: "array", sheetRows: 1 });
         const firstSheetName = workbook.SheetNames[0];
@@ -128,7 +148,7 @@ export async function extractFileHeaders(files: File[]): Promise<string[]> {
         const rows = XLSX.utils.sheet_to_json(firstSheet, { header: 1 }) as any[][];
         if (rows && rows.length > 0) {
           rows[0].forEach((h: any) => {
-            if (h !== undefined && h !== null) allHeaders.add(String(h));
+            if (h !== undefined && h !== null) allHeaders.add(String(h).trim());
           });
         }
       }
