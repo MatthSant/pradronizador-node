@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FileUpload } from '@/components/FileUpload';
 import { MappingInterface } from '@/components/MappingInterface';
+import { MappingReview } from '@/components/MappingReview';
 import { FixedValueInjector } from '@/components/FixedValueInjector';
 import { processFiles, extractFileHeaders } from '@/lib/processor';
 import { ArrowLeft, Play, Download, CheckCircle2, ChevronRight, ChevronLeft, Layers } from 'lucide-react';
@@ -55,7 +56,7 @@ export default function ProcessorPage() {
     try {
       const resp = await processFiles(files, mappings, fixedValues, type as string);
       setResult(resp);
-      setStep(4);
+      setStep(5);
     } catch (err) {
       alert('Erro ao processar arquivos.');
       console.error(err);
@@ -67,8 +68,9 @@ export default function ProcessorPage() {
   const steps = [
     { id: 1, name: 'Upload' },
     { id: 2, name: 'Mapeamento' },
-    { id: 3, name: 'Tags Fixas' },
-    { id: 4, name: 'Conclusão' }
+    { id: 3, name: 'Revisão' },
+    { id: 4, name: 'Tags Fixas' },
+    { id: 5, name: 'Conclusão' }
   ];
 
   const nextStep = () => setStep(prev => prev + 1);
@@ -163,13 +165,31 @@ export default function ProcessorPage() {
                   <ChevronLeft className="mr-3 w-4 h-4" /> Revisar Upload
                 </button>
                 <button onClick={nextStep} className="premium-button px-12 py-5 rounded-2xl text-[11px] uppercase tracking-[0.25em] flex items-center transition-all">
-                  Injetar Tags Fixas <ChevronRight className="ml-3 w-5 h-5" />
+                  Auditoria de Dados <ChevronRight className="ml-3 w-5 h-5" />
                 </button>
               </div>
             </div>
           )}
 
           {step === 3 && (
+            <div className="space-y-10">
+              <MappingReview 
+                mappings={mappings}
+                sourceColumns={sourceColumns}
+                type={type as string}
+              />
+              <div className="flex flex-col md:flex-row justify-between items-center gap-6">
+                <button onClick={prevStep} className="px-8 py-5 rounded-2xl font-black text-[10px] uppercase tracking-widest text-slate-600 hover:text-slate-900 transition-colors flex items-center">
+                  <ChevronLeft className="mr-3 w-4 h-4" /> Voltar ao Mapeamento
+                </button>
+                <button onClick={nextStep} className="premium-button px-12 py-5 rounded-2xl text-[11px] uppercase tracking-[0.25em] flex items-center transition-all">
+                  Avançar para Tags Fixas <ChevronRight className="ml-3 w-5 h-5" />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {step === 4 && (
             <div className="space-y-10">
               <FixedValueInjector 
                 unmappedTargets={Object.keys(require('@/lib/constants').FIELD_DESCRIPTIONS).filter(t => !Object.values(mappings).includes(t))}
@@ -193,7 +213,7 @@ export default function ProcessorPage() {
             </div>
           )}
 
-          {step === 4 && (
+          {step === 5 && (
             <div className="flex flex-col items-center justify-center py-24 glass-card text-center space-y-10 bg-emerald-50/[0.05] border-emerald-200">
               <div className="relative">
                 <div className="absolute inset-0 bg-emerald-600 blur-3xl opacity-10 animate-pulse" />
