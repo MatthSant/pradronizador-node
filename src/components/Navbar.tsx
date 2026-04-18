@@ -25,7 +25,7 @@ export const Navbar = () => {
           </div>
           <div className="flex flex-col">
             <span className="text-sm font-black tracking-[0.2em] leading-none uppercase text-slate-900">DataStruct</span>
-            <span className="text-[10px] font-bold text-purple-700 tracking-tighter uppercase">Frost Edition 2.1</span>
+            <span className="text-[10px] font-bold text-purple-700 tracking-tighter uppercase">DataStruct v1.0</span>
           </div>
         </Link>
         
@@ -54,7 +54,7 @@ export const Navbar = () => {
           <button 
             onClick={() => setIsSettingsOpen(true)}
             className="p-2.5 hover:bg-black/5 rounded-xl transition-all border border-transparent hover:border-black/5 group focus:ring-2 focus:ring-purple-600 outline-none"
-            title="Abrir Frost Control Center"
+            title="Abrir Central de Configurações"
           >
             <SettingsIcon className="w-4 h-4 text-slate-600 group-hover:rotate-45 transition-transform" />
           </button>

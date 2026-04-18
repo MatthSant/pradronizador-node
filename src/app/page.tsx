@@ -47,7 +47,7 @@ export default function Home() {
         >
           <div className="inline-flex items-center space-x-2 px-3 py-1 bg-purple-100/50 border border-purple-200 rounded-full mb-4">
             <Sparkles className="w-3.5 h-3.5 text-purple-700" />
-            <span className="text-[10px] font-black uppercase tracking-[0.25em] text-purple-800">Frost Processing v2.1</span>
+            <span className="text-[10px] font-black uppercase tracking-[0.25em] text-purple-800">DataStruct v1.0</span>
           </div>
           
           <h1 className="text-6xl md:text-8xl font-black tracking-tighter leading-[0.9] text-slate-900">

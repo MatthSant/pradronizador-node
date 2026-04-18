@@ -53,7 +53,7 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ isOpen, onClose 
                   <Settings className="w-5 h-5 text-purple-700" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-black text-slate-900 tracking-tighter uppercase italic">Frost Control Center</h3>
+                  <h3 className="text-lg font-black text-slate-900 tracking-tighter uppercase italic">Central de Configurações</h3>
                   <span className="text-[10px] font-black text-purple-600 uppercase tracking-widest">Painel de Auditoria Global</span>
                 </div>
               </div>
@@ -172,7 +172,7 @@ export const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ isOpen, onClose 
               <div className="pt-10 border-t border-slate-100">
                  <div className="flex items-center justify-between px-2">
                    <div className="flex flex-col">
-                     <span className="text-[10px] font-black text-slate-900 uppercase tracking-widest">Frost Engine v2.1</span>
+                     <span className="text-[10px] font-black text-slate-900 uppercase tracking-widest">DataStruct Engine v1.0</span>
                      <span className="text-[9px] font-bold text-slate-400 uppercase">Stable Build</span>
                    </div>
                    <div className="flex items-center space-x-2 text-[10px] font-black uppercase text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-full border border-emerald-100">

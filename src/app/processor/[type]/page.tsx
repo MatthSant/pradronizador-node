@@ -178,7 +178,7 @@ export default function ProcessorPage() {
               </h1>
               <div className="flex items-center space-x-2 mt-1">
                 <div className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
-                <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Frost Processing Cluster</span>
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Data Processing Cluster</span>
               </div>
             </div>
           </div>
@@ -262,7 +262,7 @@ export default function ProcessorPage() {
                   <h4 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">Sincronizando Lote</h4>
                   <p className="text-[10px] font-black uppercase tracking-[0.3em] text-purple-600 flex items-center justify-center space-x-2">
                     <Sparkles className="w-3 h-3" />
-                    <span>Frost High-Speed Engine</span>
+                    <span>High-Speed System Engine</span>
                   </p>
                 </div>
 
