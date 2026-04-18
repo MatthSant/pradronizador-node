@@ -3,14 +3,15 @@
 import React, { useState, useEffect } from 'react';
 import { FIELD_DESCRIPTIONS, HARD_MAPPINGS, UNIVERSAL_PRESETS, PLATFORM_PRESETS } from '@/lib/constants';
 import { normalizeString } from '@/lib/normalization';
-import { Check, AlertCircle, ChevronRight, Globe, FileStack, Plus, X } from 'lucide-react';
+import { Check, AlertCircle, ChevronRight, Globe, FileStack, X, Sparkles } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface MappingInterfaceProps {
   sourceColumns: string[];
   type: string;
   customFieldLabels?: Record<string, string>;
   onMappingChange: (mapping: Record<string, string>) => void;
-  onAddCustomField?: (label: string) => string; // Returns the new key
+  onAddCustomField?: (label: string) => string;
 }
 
 export const MappingInterface: React.FC<MappingInterfaceProps> = ({ 
@@ -31,37 +32,30 @@ export const MappingInterface: React.FC<MappingInterfaceProps> = ({
     ...(onAddCustomField ? [{ id: '__CREATE__', name: '+ Criar Novo Campo Customizado...' }] : []),
     ...Object.entries(FIELD_DESCRIPTIONS).map(([id, meta]) => ({
       id,
-      name: `${meta.name} (${id})`
+      name: `${meta.name}`
     })),
     ...Object.entries(customFieldLabels).map(([id, label]) => ({
       id,
-      name: `🟡 ${label} (${id})`
+      name: `🟡 ${label}`
     }))
   ];
 
   useEffect(() => {
     const initialMappings: Record<string, string> = {};
     const platformPreset = PLATFORM_PRESETS[type] || {};
-    
     sourceColumns.forEach(col => {
       const norm = normalizeString(col);
-      
-      if (platformPreset[norm]) {
-        initialMappings[col] = platformPreset[norm];
-      } else if (HARD_MAPPINGS[col]) {
-        initialMappings[col] = HARD_MAPPINGS[col];
-      } else if (UNIVERSAL_PRESETS[norm]) {
-        initialMappings[col] = UNIVERSAL_PRESETS[norm];
-      } else {
+      if (platformPreset[norm]) initialMappings[col] = platformPreset[norm];
+      else if (HARD_MAPPINGS[col]) initialMappings[col] = HARD_MAPPINGS[col];
+      else if (UNIVERSAL_PRESETS[norm]) initialMappings[col] = UNIVERSAL_PRESETS[norm];
+      else {
         const found = Object.keys(FIELD_DESCRIPTIONS).find(target => 
           normalizeString(target) === norm || 
           normalizeString(FIELD_DESCRIPTIONS[target].name) === norm
         );
-        if (found) initialMappings[col] = found;
-        else initialMappings[col] = '__NONE__';
+        initialMappings[col] = found || '__NONE__';
       }
     });
-
     setMappings(initialMappings);
   }, [sourceColumns, type]);
 
@@ -87,97 +81,112 @@ export const MappingInterface: React.FC<MappingInterfaceProps> = ({
   };
 
   return (
-    <div className="glass-card shadow-xl overflow-hidden border-slate-700 bg-slate-900/50">
-      <div className="px-6 py-4 bg-slate-800/80 border-b border-slate-700 flex justify-between items-center">
-        <div>
-          <h3 className="text-xl font-bold">🎯 Mapeamento Inteligente</h3>
-          <p className="text-xs text-slate-400 mt-0.5">Mapeie as origens do seu arquivo para os campos do banco de dados.</p>
+    <div className="glass-card shadow-2xl overflow-hidden border-black/[0.12] bg-white">
+      <div className="px-8 py-6 bg-purple-50 border-b border-purple-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div className="space-y-1">
+          <div className="flex items-center space-x-2">
+            <Sparkles className="w-4 h-4 text-purple-700" />
+            <h3 className="text-xl font-black tracking-tight text-slate-900">Mapeamento Inteligente</h3>
+          </div>
+          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Sincronização em Tempo Real (Acessível)</p>
         </div>
         
-        <div className="flex bg-slate-950 p-1 rounded-lg border border-slate-800">
+        <div className="flex bg-slate-100 p-1.5 rounded-xl border border-slate-300">
           <button 
             onClick={() => setUnifiedMode(true)}
-            className={`flex items-center space-x-2 px-3 py-1.5 rounded-md text-xs font-bold transition-all ${unifiedMode ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-slate-300'}`}
+            className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${unifiedMode ? 'bg-purple-700 text-white shadow-lg shadow-purple-700/30' : 'text-slate-600 hover:text-slate-800'}`}
           >
             <Globe className="w-3.5 h-3.5" /> <span>Unificado</span>
           </button>
           <button 
             onClick={() => setUnifiedMode(false)}
-            className={`flex items-center space-x-2 px-3 py-1.5 rounded-md text-xs font-bold transition-all ${!unifiedMode ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-slate-300'}`}
+            className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${!unifiedMode ? 'bg-purple-700 text-white shadow-lg shadow-purple-700/30' : 'text-slate-600 hover:text-slate-800'}`}
           >
-            <FileStack className="w-3.5 h-3.5" /> <span>Por Arquivo</span>
+            <FileStack className="w-3.5 h-3.5" /> <span>Individual</span>
           </button>
         </div>
       </div>
 
-      <div className="p-4 space-y-3 max-h-[500px] overflow-y-auto">
-        {sourceColumns.map(col => (
-          <div key={col} className="flex flex-col space-y-2 p-4 bg-slate-800/20 rounded-xl hover:bg-slate-800/40 transition-all border border-transparent hover:border-slate-700/50">
-            <div className="flex items-center space-x-4">
-              <div className="flex-1 min-w-0">
-                <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest mb-1 block">Origem</span>
-                <p className="text-sm font-bold truncate" title={col}>{col}</p>
-              </div>
-              
-              <div className="flex-shrink-0">
-                <ChevronRight className="w-5 h-5 text-slate-700" />
-              </div>
-              
-              <div className="flex-1 min-w-0">
-                <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest mb-1 block">Destino</span>
-                <select 
-                  value={mappings[col] || '__NONE__'}
-                  onChange={(e) => handleSelect(col, e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg text-xs font-medium px-2.5 py-2 focus:ring-2 focus:ring-indigo-500 outline-none transition-all appearance-none cursor-pointer"
-                >
-                  {targetOptions.map(opt => (
-                    <option key={opt.id} value={opt.id} className="bg-slate-900 border-none">{opt.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="w-8 flex justify-center">
-                {mappings[col] !== '__NONE__' && mappings[col] !== '__SKIP__' ? (
-                  <div className="p-1 bg-emerald-500/10 rounded-full">
-                    <Check className="w-5 h-5 text-emerald-500" />
-                  </div>
-                ) : (
-                  <div className="p-1 bg-slate-500/5 rounded-full">
-                    <AlertCircle className="w-5 h-5 text-slate-700" />
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {creatingForCol === col && (
-              <div className="mt-3 p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg animate-in slide-in-from-top-2">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-[10px] font-black text-amber-500 uppercase">Novo Campo Customizado</span>
-                  <button onClick={() => setCreatingForCol(null)} className="p-1 hover:bg-amber-500/20 rounded-full">
-                    <X className="w-3 h-3 text-amber-500" />
-                  </button>
+      <div className="p-6 space-y-4 max-h-[600px] overflow-y-auto custom-scrollbar">
+        <AnimatePresence>
+          {sourceColumns.map((col, idx) => (
+            <motion.div 
+              key={col} 
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: idx * 0.03 }}
+              className="flex flex-col space-y-3 p-5 rounded-2xl bg-slate-50 border border-slate-200 hover:bg-white hover:border-purple-300 hover:shadow-lg hover:shadow-purple-700/5 transition-all group"
+            >
+              <div className="flex items-center space-x-6">
+                <div className="flex-1 min-w-0">
+                  <span className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] mb-1.5 block">Origem de Dados</span>
+                  <p className="text-sm font-black text-slate-800 truncate" title={col}>{col}</p>
                 </div>
-                <div className="flex space-x-2">
-                  <input 
-                    autoFocus
-                    type="text"
-                    placeholder="Pergunta da Pesquisa (ex: Qual sua dor?)"
-                    value={newLabel}
-                    onChange={(e) => setNewLabel(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleCreateConfirm()}
-                    className="flex-1 bg-slate-950 border border-amber-500/30 rounded-md px-3 py-1.5 text-xs text-white focus:ring-1 focus:ring-amber-500 outline-none"
-                  />
-                  <button 
-                    onClick={handleCreateConfirm}
-                    className="bg-amber-500 hover:bg-amber-600 text-black px-4 py-1.5 rounded-md text-xs font-bold transition-colors"
+                
+                <div className="flex-shrink-0">
+                  <ChevronRight className="w-5 h-5 text-slate-300 group-hover:text-purple-500 transition-colors" />
+                </div>
+                
+                <div className="flex-1 min-w-0">
+                  <span className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em] mb-1.5 block">Atributo de Destino</span>
+                  <select 
+                    value={mappings[col] || '__NONE__'}
+                    onChange={(e) => handleSelect(col, e.target.value)}
+                    className="w-full bg-white border border-slate-300 rounded-xl text-[10px] font-black uppercase tracking-wider px-3 py-2.5 focus:ring-2 focus:ring-purple-200 outline-none transition-all appearance-none cursor-pointer hover:border-purple-400 text-slate-800"
                   >
-                    Confirmar
-                  </button>
+                    {targetOptions.map(opt => (
+                      <option key={opt.id} value={opt.id} className="text-slate-900">{opt.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="w-10 flex justify-center">
+                  {mappings[col] !== '__NONE__' && mappings[col] !== '__SKIP__' ? (
+                    <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="p-1.5 bg-emerald-100 rounded-full border border-emerald-300">
+                      <Check className="w-4 h-4 text-emerald-700" />
+                    </motion.div>
+                  ) : (
+                    <div className="p-1.5 bg-slate-200 rounded-full">
+                      <AlertCircle className="w-4 h-4 text-slate-500" />
+                    </div>
+                  )}
                 </div>
               </div>
-            )}
-          </div>
-        ))}
+
+              {creatingForCol === col && (
+                <motion.div 
+                  initial={{ opacity: 0, height: 0 }} 
+                  animate={{ opacity: 1, height: 'auto' }}
+                  className="p-5 bg-purple-50 border border-purple-300 rounded-xl space-y-4"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-black text-purple-800 uppercase tracking-widest">Definição de Campo Customizado</span>
+                    <button onClick={() => setCreatingForCol(null)} className="p-1.5 hover:bg-purple-200 rounded-lg transition-colors">
+                      <X className="w-4 h-4 text-purple-800" />
+                    </button>
+                  </div>
+                  <div className="flex gap-3">
+                    <input 
+                      autoFocus
+                      type="text"
+                      placeholder="Identificador ou Pergunta da Pesquisa..."
+                      value={newLabel}
+                      onChange={(e) => setNewLabel(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleCreateConfirm()}
+                      className="flex-1 bg-white border border-purple-300 rounded-xl px-4 py-3 text-xs text-slate-800 font-medium focus:ring-2 focus:ring-purple-300 outline-none placeholder:text-slate-400"
+                    />
+                    <button 
+                      onClick={handleCreateConfirm}
+                      className="bg-purple-700 hover:bg-purple-800 text-white px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 shadow-lg shadow-purple-700/20"
+                    >
+                      Registrar
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </motion.div>
+          ))}
+        </AnimatePresence>
       </div>
     </div>
   );

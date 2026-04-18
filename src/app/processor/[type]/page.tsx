@@ -7,7 +7,7 @@ import { FileUpload } from '@/components/FileUpload';
 import { MappingInterface } from '@/components/MappingInterface';
 import { FixedValueInjector } from '@/components/FixedValueInjector';
 import { processFiles } from '@/lib/processor';
-import { ArrowLeft, Play, Download, CheckCircle2, ChevronRight, ChevronLeft } from 'lucide-react';
+import { ArrowLeft, Play, Download, CheckCircle2, ChevronRight, ChevronLeft, Layers } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 export default function ProcessorPage() {
@@ -48,7 +48,7 @@ export default function ProcessorPage() {
     try {
       const resp = await processFiles(files, mappings, fixedValues, type as string);
       setResult(resp);
-      setStep(4); // Jump to result
+      setStep(4);
     } catch (err) {
       alert('Erro ao processar arquivos.');
       console.error(err);
@@ -61,144 +61,169 @@ export default function ProcessorPage() {
     { id: 1, name: 'Upload' },
     { id: 2, name: 'Mapeamento' },
     { id: 3, name: 'Tags Fixas' },
-    { id: 4, name: 'Resultado' }
+    { id: 4, name: 'Conclusão' }
   ];
 
   const nextStep = () => setStep(prev => prev + 1);
   const prevStep = () => setStep(prev => prev - 1);
 
   return (
-    <div className="space-y-8 max-w-5xl mx-auto px-4">
-      <button 
-        onClick={() => router.push('/')}
-        className="flex items-center text-slate-500 hover:text-white transition-all font-medium text-sm group"
-      >
-        <ArrowLeft className="w-4 h-4 mr-2 group-hover:-translate-x-1 transition-transform" /> Voltar ao Dashboard
-      </button>
-
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div>
-          <h1 className="text-4xl font-black tracking-tight flex items-center">
-            Pipeline: <span className="text-indigo-500 ml-3">wtl_{type}</span>
-          </h1>
-          <p className="text-slate-500 mt-2 font-medium">Fluxo de normalização e inteligência de dados históricos.</p>
+    <div className="space-y-12 max-w-6xl mx-auto px-4 py-8">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 border-b border-black/[0.1] pb-10">
+        <div className="space-y-4">
+          <button 
+            onClick={() => router.push('/')}
+            className="flex items-center text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 hover:text-purple-800 transition-all group"
+          >
+            <ArrowLeft className="w-3.5 h-3.5 mr-2 group-hover:-translate-x-1 transition-transform" /> Voltar ao Início
+          </button>
+          
+          <div className="flex items-center space-x-4">
+            <div className="w-12 h-12 bg-purple-100 border border-purple-200 rounded-2xl flex items-center justify-center">
+              <Layers className="text-purple-700 w-6 h-6" />
+            </div>
+            <div>
+              <h1 className="text-4xl font-black tracking-tighter text-slate-900">
+                wtl_{type} <span className="text-slate-400 ml-2 font-light">Pipeline</span>
+              </h1>
+              <div className="flex items-center space-x-2 mt-1">
+                <div className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Frost Processing Cluster</span>
+              </div>
+            </div>
+          </div>
         </div>
         
-        <div className="flex bg-slate-900 p-1 rounded-xl border border-slate-800 shadow-inner">
-          {steps.map((s, idx) => (
-            <React.Fragment key={s.id}>
-              <div className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
-                step === s.id ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20' : 
-                step > s.id ? 'text-indigo-400' : 'text-slate-600'
-              }`}>
-                {s.name}
-              </div>
-              {idx < steps.length - 1 && <div className="w-4" />}
-            </React.Fragment>
-          ))}
+        <div className="flex bg-slate-200/30 p-1.5 rounded-2xl border border-black/[0.05] shadow-inner">
+          {steps.map((s, idx) => {
+            const isActive = step === s.id;
+            const isDone = step > s.id;
+            return (
+              <React.Fragment key={s.id}>
+                <div className={`flex items-center px-4 py-2.5 rounded-xl transition-all duration-300 ${
+                  isActive ? 'bg-purple-700 text-white shadow-lg shadow-purple-700/20' : 
+                  isDone ? 'text-purple-800' : 'text-slate-400'
+                }`}>
+                  <span className="text-[10px] font-black uppercase tracking-widest">{s.name}</span>
+                  {isDone && <CheckCircle2 className="w-3 h-3 ml-2" />}
+                </div>
+                {idx < steps.length - 1 && (
+                  <div className="flex items-center px-1">
+                    <ChevronRight className="w-3 h-3 text-slate-300" />
+                  </div>
+                )}
+              </React.Fragment>
+            );
+          })}
         </div>
       </div>
 
       <AnimatePresence mode="wait">
-        {step === 1 && (
-          <motion.div key="step-1" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-8">
-            <FileUpload onFilesSelected={setFiles} />
-            <div className="flex justify-end pt-4">
-              <button 
-                disabled={files.length === 0}
-                onClick={nextStep}
-                className="premium-button px-10 py-4 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center disabled:opacity-30 disabled:grayscale transition-all"
-              >
-                Configurar Mapeamento <ChevronRight className="ml-2 w-5 h-5" />
-              </button>
-            </div>
-          </motion.div>
-        )}
-
-        {step === 2 && (
-          <motion.div key="step-mapping" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-8">
-            <MappingInterface 
-              sourceColumns={sourceColumns} 
-              type={type as string}
-              customFieldLabels={customFieldLabels}
-              onMappingChange={setMappings} 
-              onAddCustomField={isSurvey ? handleAddCustomField : undefined}
-            />
-            <div className="flex justify-between items-center pt-4">
-              <button onClick={prevStep} className="px-8 py-4 rounded-2xl font-bold text-sm text-slate-400 hover:text-white transition-colors flex items-center">
-                <ChevronLeft className="mr-2 w-5 h-5" /> Voltar
-              </button>
-              <button onClick={nextStep} className="premium-button px-10 py-4 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center">
-                Configurar Tags Fixas <ChevronRight className="ml-2 w-5 h-5" />
-              </button>
-            </div>
-          </motion.div>
-        )}
-
-        {step === 3 && (
-          <motion.div key="step-fixed" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-8">
-            <FixedValueInjector 
-              unmappedTargets={Object.keys(require('@/lib/constants').FIELD_DESCRIPTIONS).filter(t => !Object.values(mappings).includes(t))}
-              onChange={setFixedValues} 
-            />
-            <div className="flex justify-between items-center pt-4">
-              <button onClick={prevStep} className="px-8 py-4 rounded-2xl font-bold text-sm text-slate-400 hover:text-white transition-colors flex items-center">
-                <ChevronLeft className="mr-2 w-5 h-5" /> Voltar
-              </button>
-              <button 
-                onClick={handleProcess}
-                disabled={isProcessing}
-                className="premium-button px-12 py-4 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center group shadow-indigo-500/40"
-              >
-                {isProcessing ? 'Processando Dados...' : 'Finalizar e Consolidar'} 
-                {!isProcessing && <Play className="ml-3 w-5 h-5 fill-current group-hover:scale-110 transition-transform" />}
-              </button>
-            </div>
-          </motion.div>
-        )}
-
-        {step === 4 && (
-          <motion.div 
-            key="step-result"
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="flex flex-col items-center justify-center py-20 glass-card text-center space-y-8 bg-emerald-500/5 border-emerald-500/20"
-          >
-            <div className="relative">
-              <div className="absolute inset-0 bg-emerald-500 blur-2xl opacity-20 animate-pulse" />
-              <div className="relative w-24 h-24 bg-emerald-500/20 rounded-full flex items-center justify-center">
-                <CheckCircle2 className="w-14 h-14 text-emerald-500" />
+        <motion.div 
+          key={step}
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: -20 }}
+          transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+          className="min-h-[400px]"
+        >
+          {step === 1 && (
+            <div className="space-y-10">
+              <FileUpload onFilesSelected={setFiles} />
+              <div className="flex justify-center md:justify-end">
+                <button 
+                  disabled={files.length === 0}
+                  onClick={nextStep}
+                  className="premium-button px-12 py-5 rounded-2xl text-[11px] uppercase tracking-[0.25em] flex items-center disabled:opacity-30 disabled:grayscale transition-all"
+                >
+                  Confirmar Artefatos <ChevronRight className="ml-3 w-5 h-5" />
+                </button>
               </div>
             </div>
-            
-            <div>
-              <h2 className="text-4xl font-black tracking-tight">Sucesso Absoluto!</h2>
-              <p className="text-slate-400 mt-3 text-lg font-medium">
-                Consolidamos <span className="text-emerald-400 font-bold">{result?.data?.length || 0}</span> linhas de dados 100% estruturados.
-              </p>
+          )}
+
+          {step === 2 && (
+            <div className="space-y-10">
+              <MappingInterface 
+                sourceColumns={sourceColumns} 
+                type={type as string}
+                customFieldLabels={customFieldLabels}
+                onMappingChange={setMappings} 
+                onAddCustomField={isSurvey ? handleAddCustomField : undefined}
+              />
+              <div className="flex flex-col md:flex-row justify-between items-center gap-6">
+                <button onClick={prevStep} className="px-8 py-5 rounded-2xl font-black text-[10px] uppercase tracking-widest text-slate-600 hover:text-slate-900 transition-colors flex items-center">
+                  <ChevronLeft className="mr-3 w-4 h-4" /> Revisar Upload
+                </button>
+                <button onClick={nextStep} className="premium-button px-12 py-5 rounded-2xl text-[11px] uppercase tracking-[0.25em] flex items-center transition-all">
+                  Injetar Tags Fixas <ChevronRight className="ml-3 w-5 h-5" />
+                </button>
+              </div>
             </div>
-            
-            <div className="flex flex-col md:flex-row gap-4 pt-4">
-              <button 
-                onClick={() => {
-                  const ws = XLSX.utils.json_to_sheet(result.data);
-                  const wb = XLSX.utils.book_new();
-                  XLSX.utils.book_append_sheet(wb, ws, "Resultado");
-                  XLSX.writeFile(wb, `consolidado_${type}.xlsx`);
-                }}
-                className="premium-button px-12 py-5 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center shadow-indigo-500/40"
-              >
-                Baixar Planilha Consolidada <Download className="ml-3 w-6 h-6" />
-              </button>
-              <button 
-                onClick={() => window.location.reload()}
-                className="px-10 py-5 rounded-2xl font-black text-sm uppercase tracking-widest bg-slate-800 hover:bg-slate-700 transition-all border border-slate-700"
-              >
-                Processar Novo Lote
-              </button>
+          )}
+
+          {step === 3 && (
+            <div className="space-y-10">
+              <FixedValueInjector 
+                unmappedTargets={Object.keys(require('@/lib/constants').FIELD_DESCRIPTIONS).filter(t => !Object.values(mappings).includes(t))}
+                onChange={setFixedValues} 
+              />
+              <div className="flex flex-col md:flex-row justify-between items-center gap-6">
+                <button onClick={prevStep} className="px-8 py-5 rounded-2xl font-black text-[10px] uppercase tracking-widest text-slate-600 hover:text-slate-900 transition-colors flex items-center">
+                  <ChevronLeft className="mr-3 w-4 h-4" /> Voltar ao Mapeamento
+                </button>
+                <button 
+                  onClick={handleProcess}
+                  disabled={isProcessing}
+                  className="premium-button px-14 py-5 rounded-2xl text-[11px] uppercase tracking-[0.25em] flex items-center group relative overflow-hidden"
+                >
+                  <span className="relative z-10">
+                    {isProcessing ? 'Sincronizando...' : 'Consolidar Lote'} 
+                  </span>
+                  {!isProcessing && <Play className="ml-4 w-4 h-4 fill-current group-hover:scale-110 transition-transform relative z-10" />}
+                </button>
+              </div>
             </div>
-          </motion.div>
-        )}
+          )}
+
+          {step === 4 && (
+            <div className="flex flex-col items-center justify-center py-24 glass-card text-center space-y-10 bg-emerald-50/[0.05] border-emerald-200">
+              <div className="relative">
+                <div className="absolute inset-0 bg-emerald-600 blur-3xl opacity-10 animate-pulse" />
+                <div className="relative w-28 h-28 bg-emerald-100 rounded-3xl flex items-center justify-center border border-emerald-200 rotate-3 animate-in zoom-in-50 duration-700">
+                  <CheckCircle2 className="w-16 h-16 text-emerald-700" />
+                </div>
+              </div>
+              
+              <div className="space-y-4">
+                <h2 className="text-5xl font-black tracking-tighter text-slate-900">Pipeline Concluído.</h2>
+                <p className="text-slate-700 text-lg font-bold">
+                  Processamos <span className="text-emerald-700 font-extrabold">{result?.data?.length || 0}</span> registros com sucesso nominal.
+                </p>
+              </div>
+              
+              <div className="flex flex-col md:flex-row gap-5 pt-6">
+                <button 
+                  onClick={() => {
+                    const ws = XLSX.utils.json_to_sheet(result.data);
+                    const wb = XLSX.utils.book_new();
+                    XLSX.utils.book_append_sheet(wb, ws, "Resultado");
+                    XLSX.writeFile(wb, `consolidado_${type}.xlsx`);
+                  }}
+                  className="premium-button px-14 py-6 rounded-2xl text-[12px] uppercase tracking-[0.3em] flex items-center shadow-xl shadow-purple-700/30"
+                >
+                  Baixar Consolidação <Download className="ml-4 w-6 h-6" />
+                </button>
+                <button 
+                  onClick={() => window.location.reload()}
+                  className="px-10 py-6 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] bg-slate-100 hover:bg-slate-200 transition-all border border-slate-200 text-slate-600"
+                >
+                  Novo Pipeline
+                </button>
+              </div>
+            </div>
+          )}
+        </motion.div>
       </AnimatePresence>
     </div>
   );
