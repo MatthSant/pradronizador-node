@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { FileUpload } from '@/components/FileUpload';
 import { MappingInterface } from '@/components/MappingInterface';
 import { FixedValueInjector } from '@/components/FixedValueInjector';
-import { processFiles } from '@/lib/processor';
+import { processFiles, extractFileHeaders } from '@/lib/processor';
 import { ArrowLeft, Play, Download, CheckCircle2, ChevronRight, ChevronLeft, Layers } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
@@ -16,6 +16,7 @@ export default function ProcessorPage() {
   
   const [step, setStep] = useState<number>(1);
   const [files, setFiles] = useState<File[]>([]);
+  const [sourceColumns, setSourceColumns] = useState<string[]>([]);
   const [mappings, setMappings] = useState<Record<string, string>>({});
   const [customFields, setCustomFields] = useState<{key: string, label: string}[]>([]);
   const [fixedValues, setFixedValues] = useState<Record<string, string>>({});
@@ -24,9 +25,15 @@ export default function ProcessorPage() {
 
   const isSurvey = type === 'survey';
 
-  const sourceColumns = useMemo(() => {
-    return files.length > 0 ? ['Email', 'Nome', 'Telefone', 'Data da Transação', 'Status do Pedido', 'Campanha', 'Valor', 'Pergunta Extra 1'] : [];
-  }, [files]);
+  const handleFilesSelected = async (selectedFiles: File[]) => {
+    setFiles(selectedFiles);
+    if (selectedFiles.length > 0) {
+      const headers = await extractFileHeaders(selectedFiles);
+      setSourceColumns(headers);
+    } else {
+      setSourceColumns([]);
+    }
+  };
 
   const customFieldLabels = useMemo(() => {
     const labels: Record<string, string> = {};
@@ -129,7 +136,7 @@ export default function ProcessorPage() {
         >
           {step === 1 && (
             <div className="space-y-10">
-              <FileUpload onFilesSelected={setFiles} />
+              <FileUpload onFilesSelected={handleFilesSelected} />
               <div className="flex justify-center md:justify-end">
                 <button 
                   disabled={files.length === 0}

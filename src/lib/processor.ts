@@ -98,3 +98,44 @@ export async function processFiles(
 
   return { data: combinedData, logs };
 }
+
+export async function extractFileHeaders(files: File[]): Promise<string[]> {
+  const allHeaders = new Set<string>();
+
+  for (const file of files) {
+    try {
+      const buffer = await file.arrayBuffer();
+      
+      if (file.name.toLowerCase().endsWith(".csv")) {
+        const text = new TextDecoder("utf-8", { fatal: false }).decode(buffer);
+        // Only parse the headers (first row)
+        const rawData = parse(text, {
+          to: 1, // Only read first line
+          columns: false,
+          skip_empty_lines: true,
+          trim: true,
+        });
+        if (rawData && rawData.length > 0) {
+          rawData[0].forEach((h: string) => allHeaders.add(h));
+        }
+      } else {
+        // Read only the first row for performance
+        const workbook = XLSX.read(buffer, { type: "array", sheetRows: 1 });
+        const firstSheetName = workbook.SheetNames[0];
+        const firstSheet = workbook.Sheets[firstSheetName];
+        
+        // sheet_to_json with header: 1 returns an array of arrays
+        const rows = XLSX.utils.sheet_to_json(firstSheet, { header: 1 }) as any[][];
+        if (rows && rows.length > 0) {
+          rows[0].forEach((h: any) => {
+            if (h !== undefined && h !== null) allHeaders.add(String(h));
+          });
+        }
+      }
+    } catch (e) {
+      console.error(`Error extracting headers from ${file.name}:`, e);
+    }
+  }
+
+  return Array.from(allHeaders);
+}
