@@ -1,301 +1,348 @@
 import * as XLSX from "xlsx";
 import Papa from "papaparse";
+
+import { makeUniqueHeaders } from "./headers";
 import { cleanEmail, mapStatus, cleanSurrogates, normalizeDate } from "./normalization";
 
-export interface ProcessingResult {
-  data: any[];
-  logs: { 
-    arquivo: string; 
-    origem: string; 
-    destino: string; 
-    status: 'MAPEADO' | 'DESCARTADO' | 'INJETADO'
-  }[];
+export interface MappingLog {
+  arquivo: string;
+  origem: string;
+  destino: string;
+  status: "MAPEADO" | "DESCARTADO" | "INJETADO";
 }
 
-// Helper to parse CSV using PapaParse (more robust for browser/large files)
-function parseCsv(file: File, options: any): Promise<any[]> {
+export interface ProcessingResult {
+  data: Record<string, unknown>[];
+  logs: MappingLog[];
+}
+
+export interface FileHeaderMetadata {
+  headers: string[];
+  samples: Record<string, string[]>;
+}
+
+type FileMappings = Record<string, Record<string, string>>;
+type FixedValues = Record<string, Record<string, string>>;
+type ParsedRow = Record<string, unknown>;
+
+interface ParsedFileData {
+  headers: string[];
+  rows: ParsedRow[];
+}
+
+function isCsvFile(file: File): boolean {
+  return file.name.toLowerCase().endsWith(".csv");
+}
+
+function isMeaningfulValue(value: unknown): boolean {
+  return value !== undefined && value !== null && String(value).trim() !== "";
+}
+
+function isDateTarget(target: string): boolean {
+  return target === "data" || target.includes("_date") || target === "created_at";
+}
+
+function isStatusTarget(target: string): boolean {
+  return target === "field_transaction_status" || target === "field_status";
+}
+
+function isEmptyMatrixRow(row: unknown[]): boolean {
+  return row.every((cell) => !isMeaningfulValue(cell));
+}
+
+function normalizeMatrixRows(rows: unknown[]): unknown[][] {
+  return rows.filter((row): row is unknown[] => Array.isArray(row));
+}
+
+function buildRowsFromMatrix(matrix: unknown[][]): ParsedFileData {
+  if (matrix.length === 0) {
+    return { headers: [], rows: [] };
+  }
+
+  const [headerRow, ...dataRows] = matrix;
+  const headers = makeUniqueHeaders(headerRow);
+  const rows = dataRows
+    .filter((row) => !isEmptyMatrixRow(row))
+    .map((row) => {
+      const record: ParsedRow = {};
+
+      headers.forEach((header, index) => {
+        record[header] = row[index] ?? "";
+      });
+
+      return record;
+    });
+
+  return { headers, rows };
+}
+
+function getFirstWorksheet(workbook: XLSX.WorkBook, fileName: string): XLSX.WorkSheet {
+  if (!workbook.SheetNames.length) {
+    throw new Error(`Arquivo ${fileName} não possui abas legíveis.`);
+  }
+
+  const firstSheetName = workbook.SheetNames[0];
+  const firstSheet = workbook.Sheets[firstSheetName];
+
+  if (!firstSheet) {
+    throw new Error(`A primeira aba do arquivo ${fileName} não pôde ser lida.`);
+  }
+
+  return firstSheet;
+}
+
+async function parseCsvMatrix(file: File, previewRows?: number): Promise<unknown[][]> {
+  const csvText = await file.text();
+
   return new Promise((resolve, reject) => {
-    Papa.parse(file, {
-      ...options,
-      header: options.columns === true,
-      skipEmptyLines: options.skip_empty_lines || true,
-      transformHeader: (h) => h.trim(),
+    Papa.parse(csvText, {
+      header: false,
+      skipEmptyLines: true,
+      preview: previewRows ? previewRows + 1 : undefined,
       complete: (results) => {
-        resolve(results.data);
+        resolve(normalizeMatrixRows(results.data));
       },
       error: (err) => {
         reject(err);
-      }
+      },
     });
   });
 }
 
+async function parseXlsxMatrix(file: File, previewRows?: number): Promise<unknown[][]> {
+  const buffer = await file.arrayBuffer();
+  const workbook = XLSX.read(buffer, {
+    type: "array",
+    cellDates: true,
+    ...(previewRows ? { sheetRows: previewRows + 1 } : {}),
+  });
+  const firstSheet = getFirstWorksheet(workbook, file.name);
+
+  return normalizeMatrixRows(
+    XLSX.utils.sheet_to_json<unknown[]>(firstSheet, {
+      header: 1,
+      defval: "",
+    })
+  );
+}
+
+async function parseTabularFile(file: File, previewRows?: number): Promise<ParsedFileData> {
+  const matrix = isCsvFile(file)
+    ? await parseCsvMatrix(file, previewRows)
+    : await parseXlsxMatrix(file, previewRows);
+
+  return buildRowsFromMatrix(matrix);
+}
+
+function normalizeMappedValue(
+  target: string,
+  value: unknown,
+  statusMappings?: Record<string, string>
+): unknown {
+  let normalizedValue = cleanSurrogates(value);
+
+  if (target === "field_email") {
+    normalizedValue = cleanEmail(String(normalizedValue));
+  }
+
+  if (isStatusTarget(target)) {
+    const rawStatus = String(normalizedValue).trim();
+    normalizedValue =
+      statusMappings && statusMappings[rawStatus]
+        ? statusMappings[rawStatus]
+        : mapStatus(rawStatus);
+  }
+
+  if (isDateTarget(target)) {
+    normalizedValue = normalizeDate(normalizedValue);
+  }
+
+  return normalizedValue;
+}
+
 export async function processFiles(
   files: File[],
-  mappings: Record<string, Record<string, string>>, // Key: filename, Value: { sourceCol: targetAttr }
-  fixedValues: Record<string, Record<string, string>>, // Key: filename, Value: { targetAttr: value }
+  mappings: FileMappings,
+  fixedValues: FixedValues,
   type: string,
-  onProgress?: (filename: string, index: number, total: number) => void,
-  statusMappings?: Record<string, string> // New: manual status overrrides
+  onProgress?: (filename: string, index: number, total: number) => void | Promise<void>,
+  statusMappings?: Record<string, string>
 ): Promise<ProcessingResult> {
-  let combinedData: any[] = [];
-  let logs: { arquivo: string; origem: string; destino: string; status: 'MAPEADO' | 'DESCARTADO' | 'INJETADO' }[] = [];
+  const combinedData: Record<string, unknown>[] = [];
+  const logs: MappingLog[] = [];
 
-  for (let i = 0; i < files.length; i++) {
-    const file = files[i];
-    if (onProgress) onProgress(file.name, i + 1, files.length);
+  if (!type) {
+    return { data: combinedData, logs };
+  }
 
-    let rawData: any[] = [];
+  for (let index = 0; index < files.length; index += 1) {
+    const file = files[index];
+
+    if (onProgress) {
+      await onProgress(file.name, index + 1, files.length);
+    }
+
+    let parsedFile: ParsedFileData = { headers: [], rows: [] };
     const fileMappings = mappings[file.name] || {};
     const fileFixedValues = fixedValues[file.name] || {};
 
     try {
-      if (file.name.toLowerCase().endsWith(".csv")) {
-        rawData = await parseCsv(file, {
-          columns: true,
-          skip_empty_lines: true,
-        });
-      } else {
-        const buffer = await file.arrayBuffer();
-        const workbook = XLSX.read(buffer, { type: "array", cellDates: true });
-        const firstSheetName = workbook.SheetNames[0];
-        const firstSheet = workbook.Sheets[firstSheetName];
-        rawData = XLSX.utils.sheet_to_json(firstSheet);
-      }
-    } catch (e) {
-      console.error(`Error reading ${file.name}:`, e);
+      parsedFile = await parseTabularFile(file);
+    } catch (error) {
+      console.error(`Error reading ${file.name}:`, error);
       continue;
     }
 
-    if (rawData.length > 0) {
-      const firstRow = rawData[0];
-      const headers = Object.keys(firstRow);
+    if (parsedFile.headers.length > 0) {
+      parsedFile.headers.forEach((header) => {
+        const target = fileMappings[header];
 
-      // Log Mappings and Discards
-      headers.forEach(h => {
-        const target = fileMappings[h];
         if (target && target !== "__NONE__" && target !== "__SKIP__") {
-          logs.push({ arquivo: file.name, origem: h, destino: target, status: 'MAPEADO' });
-        } else {
-          logs.push({ arquivo: file.name, origem: h, destino: '(Ignorado)', status: 'DESCARTADO' });
+          logs.push({ arquivo: file.name, origem: header, destino: target, status: "MAPEADO" });
+          return;
         }
+
+        logs.push({
+          arquivo: file.name,
+          origem: header,
+          destino: "(Ignorado)",
+          status: "DESCARTADO",
+        });
       });
 
-      // Log Injected Values
-      Object.entries(fileFixedValues).forEach(([target, _]) => {
-        logs.push({ arquivo: file.name, origem: '(Fixo)', destino: target, status: 'INJETADO' });
+      Object.keys(fileFixedValues).forEach((target) => {
+        logs.push({ arquivo: file.name, origem: "(Fixo)", destino: target, status: "INJETADO" });
       });
     }
 
-    // Process the data row by row
-    // Group this file's mappings by target to handle backfill/coalesce
     const targetToSources: Record<string, string[]> = {};
+
     Object.entries(fileMappings).forEach(([source, target]) => {
       if (target !== "__NONE__" && target !== "__SKIP__") {
-        if (!targetToSources[target]) targetToSources[target] = [];
+        if (!targetToSources[target]) {
+          targetToSources[target] = [];
+        }
+
         targetToSources[target].push(source);
       }
     });
 
-    const allTargets = Array.from(new Set([
-      ...Object.values(fileMappings).filter(v => v !== "__NONE__" && v !== "__SKIP__"),
-      ...Object.keys(fileFixedValues)
-    ]));
+    const allTargets = Array.from(
+      new Set([
+        ...Object.values(fileMappings).filter(
+          (value) => value !== "__NONE__" && value !== "__SKIP__"
+        ),
+        ...Object.keys(fileFixedValues),
+      ])
+    );
 
-    const processedRows = rawData.map((row) => {
-      const newRow: Record<string, any> = {};
-      
-      // 1. Process Mappings for this file
-      allTargets.forEach(target => {
+    const processedRows = parsedFile.rows.map((row) => {
+      const newRow: ParsedRow = {};
+
+      allTargets.forEach((target) => {
         const sources = targetToSources[target] || [];
-        let value: any = null;
+        let value: unknown = null;
 
         for (const source of sources) {
-          if (row[source] !== undefined && row[source] !== null && String(row[source]).trim() !== "") {
+          if (isMeaningfulValue(row[source])) {
             value = row[source];
-            break; 
+            break;
           }
         }
 
         if (value !== null) {
-          value = cleanSurrogates(value);
-          if (target === "field_email") value = cleanEmail(String(value));
-          
-          // STATUS NORMALIZATION LOGIC
-          if (target === "field_transaction_status" || target === "field_status") {
-            const rawStatus = String(value).trim();
-            // Use manual mapping if provided, else fallback to automatic logic
-            if (statusMappings && statusMappings[rawStatus]) {
-              value = statusMappings[rawStatus];
-            } else {
-              value = mapStatus(rawStatus);
-            }
-          }
-          
-          if (target === "data" || target.includes("_date") || target === "created_at") {
-            value = normalizeDate(value);
-          }
+          value = normalizeMappedValue(target, value, statusMappings);
         }
 
         newRow[target] = value;
       });
 
-      // 2. Apply Fixed Values
       Object.entries(fileFixedValues).forEach(([target, value]) => {
         if (!newRow[target] || String(newRow[target]).trim() === "") {
           newRow[target] = value;
         }
       });
 
-      newRow["idform"] = file.name;
+      newRow.idform = file.name;
+
       return newRow;
     });
 
-    combinedData = [...combinedData, ...processedRows];
+    combinedData.push(...processedRows);
   }
 
   return { data: combinedData, logs };
 }
 
-/**
- * Scans all provided files to find unique values in the column(s) mapped to status.
- */
 export async function discoverUniqueStatuses(
   files: File[],
-  mappings: Record<string, Record<string, string>>,
+  mappings: FileMappings,
   type: string
 ): Promise<string[]> {
   const uniqueStatuses = new Set<string>();
-  if (type !== 'transactions') return [];
+
+  if (type !== "transactions") {
+    return [];
+  }
 
   for (const file of files) {
     const fileMappings = mappings[file.name] || {};
     const statusCols = Object.entries(fileMappings)
-      .filter(([_, target]) => target === 'field_transaction_status' || target === 'field_status')
-      .map(([source, _]) => source);
+      .filter(([, target]) => isStatusTarget(target))
+      .map(([source]) => source);
 
-    if (statusCols.length === 0) continue;
+    if (statusCols.length === 0) {
+      continue;
+    }
 
     try {
-      if (file.name.toLowerCase().endsWith(".csv")) {
-        await new Promise<void>((resolve) => {
-          Papa.parse(file, {
-            header: true,
-            skipEmptyLines: true,
-            step: (results) => {
-              const row = results.data as any;
-              statusCols.forEach(col => {
-                const val = row[col];
-                if (val !== undefined && val !== null && String(val).trim().length > 0) {
-                  uniqueStatuses.add(String(val).trim());
-                }
-              });
-            },
-            complete: () => {
-              resolve();
-            }
-          });
+      const parsedFile = await parseTabularFile(file);
+
+      parsedFile.rows.forEach((row) => {
+        statusCols.forEach((column) => {
+          const value = row[column];
+
+          if (isMeaningfulValue(value)) {
+            uniqueStatuses.add(String(value).trim());
+          }
         });
-      } else {
-        const buffer = await file.arrayBuffer();
-        const workbook = XLSX.read(buffer, { type: "array" });
-        const firstSheetName = workbook.SheetNames[0];
-        const firstSheet = workbook.Sheets[firstSheetName];
-        const rows = XLSX.utils.sheet_to_json(firstSheet) as any[];
-        
-        rows.forEach(row => {
-          statusCols.forEach(col => {
-            const val = row[col];
-            if (val !== undefined && val !== null && String(val).trim().length > 0) {
-              uniqueStatuses.add(String(val).trim());
-            }
-          });
-        });
-      }
-    } catch (e) {
-      console.error(`Error scanning statuses in ${file.name}:`, e);
+      });
+    } catch (error) {
+      console.error(`Error scanning statuses in ${file.name}:`, error);
     }
   }
 
   return Array.from(uniqueStatuses).sort();
 }
 
-export async function extractFileHeaders(files: File[]): Promise<Record<string, { headers: string[], samples: Record<string, string[]> }>> {
-  const result: Record<string, { headers: string[], samples: Record<string, string[]> }> = {};
+export async function extractFileHeaders(files: File[]): Promise<Record<string, FileHeaderMetadata>> {
+  const result: Record<string, FileHeaderMetadata> = {};
 
   for (const file of files) {
-    const allHeaders = new Set<string>();
-    const columnSamples: Record<string, Set<string>> = {};
-
     try {
-      if (file.name.toLowerCase().endsWith(".csv")) {
-        await new Promise<void>((resolve) => {
-          Papa.parse(file, {
-            preview: 50, 
-            header: false,
-            complete: (results) => {
-              if (results.data && results.data.length > 0) {
-                const headers = results.data[0] as string[];
-                const rows = results.data.slice(1);
-                
-                headers.forEach((h, idx) => {
-                  if (typeof h === 'string' && h.trim().length > 0) {
-                    const cleanH = h.trim();
-                    allHeaders.add(cleanH);
-                    if (!columnSamples[cleanH]) columnSamples[cleanH] = new Set();
-                    
-                    rows.forEach((row: any) => {
-                      const val = row[idx];
-                      if (val !== undefined && val !== null && String(val).trim().length > 0) {
-                        if (columnSamples[cleanH].size < 5) columnSamples[cleanH].add(String(val).trim());
-                      }
-                    });
-                  }
-                });
-              }
-              resolve();
-            }
-          });
-        });
-      } else {
-        const buffer = await file.arrayBuffer();
-        const workbook = XLSX.read(buffer, { type: "array", sheetRows: 50 });
-        const firstSheetName = workbook.SheetNames[0];
-        const firstSheet = workbook.Sheets[firstSheetName];
-        
-        const rows = XLSX.utils.sheet_to_json(firstSheet, { header: 1 }) as any[][];
-        if (rows && rows.length > 0) {
-          const headers = rows[0];
-          const dataRows = rows.slice(1);
-          
-          headers.forEach((h, idx) => {
-            const cleanH = String(h || "").trim();
-            if (cleanH.length > 0) {
-              allHeaders.add(cleanH);
-              if (!columnSamples[cleanH]) columnSamples[cleanH] = new Set();
-              
-              dataRows.forEach((row: any) => {
-                const val = row[idx];
-                if (val !== undefined && val !== null && String(val).trim().length > 0) {
-                  if (columnSamples[cleanH].size < 5) columnSamples[cleanH].add(String(val).trim());
-                }
-              });
-            }
-          });
-        }
-      }
+      const parsedFile = await parseTabularFile(file, 50);
+      const columnSamples: Record<string, Set<string>> = {};
 
-      const finalSamples: Record<string, string[]> = {};
-      Object.entries(columnSamples).forEach(([h, set]) => {
-        finalSamples[h] = Array.from(set);
+      parsedFile.headers.forEach((header) => {
+        columnSamples[header] = new Set();
+
+        parsedFile.rows.forEach((row) => {
+          const value = row[header];
+
+          if (isMeaningfulValue(value) && columnSamples[header].size < 5) {
+            columnSamples[header].add(String(value).trim());
+          }
+        });
       });
 
       result[file.name] = {
-        headers: Array.from(allHeaders),
-        samples: finalSamples
+        headers: parsedFile.headers,
+        samples: Object.fromEntries(
+          Object.entries(columnSamples).map(([header, samples]) => [header, Array.from(samples)])
+        ),
       };
-    } catch (e) {
-      console.error(`Error extracting headers from ${file.name}:`, e);
+    } catch (error) {
+      console.error(`Error extracting headers from ${file.name}:`, error);
       result[file.name] = { headers: [], samples: {} };
     }
   }
