@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, useRef, ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 
 interface CustomField {
@@ -36,6 +36,7 @@ export const PipelineProvider = ({ children }: { children: ReactNode }) => {
   const [customFields, setCustomFields] = useState<CustomField[]>([]);
   const [statusMappings, setStatusMappings] = useState<Record<string, string>>({});
   const [fixedValues, setFixedValues] = useState<Record<string, Record<string, string>>>({});
+  const customFieldSeq = useRef(0);
 
   const updateMapping = useCallback((fileKey: string, fileMappings: Record<string, string>) => {
     setMappings(prev => ({
@@ -45,11 +46,13 @@ export const PipelineProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const addCustomField = useCallback((label: string) => {
-    const nextIdx = customFields.length + 1;
-    const newKey = `custom_field_${nextIdx}`;
+    customFieldSeq.current += 1;
+    const newKey = `custom_field_${customFieldSeq.current}`;
+
     setCustomFields(prev => [...prev, { key: newKey, label }]);
+
     return newKey;
-  }, [customFields.length]);
+  }, []);
 
   const updateCustomField = useCallback((key: string, newLabel: string) => {
     setCustomFields(prev => prev.map(f => f.key === key ? { ...f, label: newLabel } : f));
@@ -66,6 +69,7 @@ export const PipelineProvider = ({ children }: { children: ReactNode }) => {
     setCustomFields([]);
     setStatusMappings({});
     setFixedValues({});
+    customFieldSeq.current = 0;
     router.push('/');
   }, [router]);
 

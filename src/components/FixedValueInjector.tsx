@@ -22,7 +22,12 @@ export const FixedValueInjector: React.FC<FixedValueInjectorProps> = ({
   const [activeFileIdx, setActiveFileIdx] = useState(0);
   const activeFile = files[activeFileIdx];
   const activeFileKey = activeFile ? getFileKey(activeFile) : null;
-  const activeValues = activeFileKey ? initialValues[activeFileKey] || {} : {};
+
+  if (!activeFile || !activeFileKey) {
+    return null;
+  }
+
+  const activeValues = initialValues[activeFileKey] || {};
 
   const updateFileValues = (newValues: Record<string, string>) => {
     if (!activeFileKey) return;
