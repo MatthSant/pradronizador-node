@@ -8,6 +8,7 @@ import { MappingInterface } from '@/components/MappingInterface';
 import { MappingReview } from '@/components/MappingReview';
 import { StatusNormalizer } from '@/components/StatusNormalizer';
 import { FixedValueInjector } from '@/components/FixedValueInjector';
+import { createCsvBlob } from '@/lib/csv';
 import { processFiles, extractFileHeaders, discoverUniqueStatuses } from '@/lib/processor';
 import { ArrowLeft, Play, Download, CheckCircle2, ChevronRight, ChevronLeft, Layers, Loader2, Sparkles } from 'lucide-react';
 import { usePipeline } from '@/providers/PipelineContext';
@@ -120,29 +121,21 @@ export default function ProcessorPage() {
     }
   };
 
-  const downloadCsv = (data: any[], filename: string) => {
+  const downloadCsv = (data: Record<string, unknown>[], filename: string) => {
     if (!data || data.length === 0) return;
-    const headers = Object.keys(data[0]);
-    const csvContent = [
-      headers.join(','),
-      ...data.map(row => headers.map(h => {
-        const val = row[h] === null || row[h] === undefined ? "" : String(row[h]);
-        if (val.includes(',') || val.includes('"') || val.includes('\n')) {
-          return `"${val.replace(/"/g, '""')}"`;
-        }
-        return val;
-      }).join(','))
-    ].join('\n');
-
-    const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement("a");
+    const blob = createCsvBlob(data);
     const url = URL.createObjectURL(blob);
-    link.setAttribute("href", url);
-    link.setAttribute("download", filename);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+
+    try {
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } finally {
+      setTimeout(() => URL.revokeObjectURL(url), 0);
+    }
   };
 
   const steps = [
