@@ -23,7 +23,8 @@ export default function ProcessorPage() {
     mappings, setMappings, updateMapping,
     customFields, addCustomField, 
     statusMappings, setStatusMappings,
-    fixedValues, setFixedValues 
+    fixedValues, setFixedValues,
+    resetSession
   } = usePipeline();
   
   const [step, setStep] = useState<number>(1);
@@ -703,7 +704,7 @@ export default function ProcessorPage() {
 
               <div className="flex justify-center pt-8">
                 <button 
-                  onClick={() => window.location.reload()}
+                  onClick={resetSession}
                   className="px-12 py-5 rounded-2xl text-technical text-slate-400 hover:text-slate-900 transition-all"
                 >
                   Reiniciar Outro Lote
