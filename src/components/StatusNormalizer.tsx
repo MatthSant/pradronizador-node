@@ -2,12 +2,13 @@
 
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import type { StatusDiscoveryWarning } from '@/lib/processor';
+import type { ProcessingIssue } from '@/lib/processor';
 import { CheckCircle2, AlertCircle, ShieldCheck, CreditCard, Ban, Undo2 } from 'lucide-react';
 
 interface StatusNormalizerProps {
   discoveredStatuses: string[];
-  warnings: StatusDiscoveryWarning[];
+  errors: ProcessingIssue[];
+  warnings: ProcessingIssue[];
   mappings: Record<string, string>;
   onChange: (mappings: Record<string, string>) => void;
 }
@@ -21,6 +22,7 @@ const TARGET_STATUSES = [
 
 export const StatusNormalizer: React.FC<StatusNormalizerProps> = ({ 
   discoveredStatuses, 
+  errors,
   warnings,
   mappings, 
   onChange 
@@ -54,6 +56,22 @@ export const StatusNormalizer: React.FC<StatusNormalizerProps> = ({
           </div>
         </div>
       </div>
+
+      {errors.length > 0 && (
+        <div className="p-8 bg-rose-50/50 border border-rose-100 rounded-[2rem]">
+          <div className="flex items-center space-x-3 text-rose-700 mb-4">
+            <AlertCircle className="w-5 h-5" />
+            <h4 className="text-technical">Falhas na Leitura de Status</h4>
+          </div>
+          <div className="space-y-2">
+            {errors.map((issue, index) => (
+              <p key={`${issue.fileName}-${issue.code}-${index}`} className="text-sm text-rose-900 font-medium leading-relaxed">
+                {issue.fileName}: {issue.message}
+              </p>
+            ))}
+          </div>
+        </div>
+      )}
 
       {warnings.length > 0 && (
         <div className="p-8 bg-amber-50/50 border border-amber-100 rounded-[2rem]">
@@ -152,8 +170,8 @@ export const StatusNormalizer: React.FC<StatusNormalizerProps> = ({
         <div className="space-y-2">
           <h5 className="text-base font-bold text-slate-900 tracking-tight">Integridade da Normalização</h5>
           <p className="text-sm text-slate-500 font-medium leading-relaxed max-w-2xl">
-            Sugerimos mapear todas as ocorrências. Itens ignorados serão processados pelo motor de <b>Auto-Resolve</b>, 
-            que aplicará rótulos aproximados baseados em semântica (Experimental).
+            Mapeie todas as ocorrências detectadas para evitar status sem padronização. 
+            Valores não mapeados continuarão sem normalização automática nesta etapa.
           </p>
         </div>
       </div>

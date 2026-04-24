@@ -11,8 +11,8 @@ import { FixedValueInjector } from '@/components/FixedValueInjector';
 import { createCsvBlob } from '@/lib/csv';
 import { FIELD_DESCRIPTIONS } from '@/lib/constants';
 import { getFileKey } from '@/lib/files';
-import { processFiles, extractFileHeaders, discoverUniqueStatuses, type FileHeaderMetadata, type ProcessingResult, type StatusDiscoveryWarning } from '@/lib/processor';
-import { Play, Download, CheckCircle2, ChevronRight, ChevronLeft, Layers, Loader2, Sparkles } from 'lucide-react';
+import { processFiles, extractFileHeaders, discoverUniqueStatuses, type FileHeaderMetadata, type ProcessingIssue, type ProcessingResult } from '@/lib/processor';
+import { Play, Download, CheckCircle2, ChevronRight, ChevronLeft, Layers, Loader2, Sparkles, AlertTriangle } from 'lucide-react';
 import { usePipeline } from '@/providers/PipelineContext';
 
 export default function ProcessorPage() {
@@ -30,7 +30,10 @@ export default function ProcessorPage() {
   const [perFileData, setPerFileData] = useState<Record<string, FileHeaderMetadata>>({});
   const [activeMappingFileIdx, setActiveMappingFileIdx] = useState(0);
   const [discoveredStatuses, setDiscoveredStatuses] = useState<string[]>([]);
-  const [statusDiscoveryWarnings, setStatusDiscoveryWarnings] = useState<StatusDiscoveryWarning[]>([]);
+  const [headerExtractionErrors, setHeaderExtractionErrors] = useState<ProcessingIssue[]>([]);
+  const [statusDiscoveryWarnings, setStatusDiscoveryWarnings] = useState<ProcessingIssue[]>([]);
+  const [statusDiscoveryErrors, setStatusDiscoveryErrors] = useState<ProcessingIssue[]>([]);
+  const [pageErrorMessage, setPageErrorMessage] = useState<string | null>(null);
   const [isDiscoveringStatuses, setIsDiscoveringStatuses] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingStatus, setProcessingStatus] = useState({ current: 0, total: 0, fileName: '' });
@@ -44,6 +47,9 @@ export default function ProcessorPage() {
 
   const handleFilesSelected = async (selectedFiles: File[]) => {
     setFiles(selectedFiles);
+    setPageErrorMessage(null);
+    setHeaderExtractionErrors([]);
+    setStatusDiscoveryErrors([]);
     setStatusDiscoveryWarnings([]);
     setDiscoveredStatuses([]);
     
@@ -62,8 +68,9 @@ export default function ProcessorPage() {
     if (selectedFiles.length > 0) {
       setIsExtractingHeaders(true);
       try {
-        const fileMetadata = await extractFileHeaders(selectedFiles);
-        setPerFileData(fileMetadata);
+        const extractionResult = await extractFileHeaders(selectedFiles);
+        setPerFileData(extractionResult.metadata);
+        setHeaderExtractionErrors(extractionResult.errors);
       } finally {
         setIsExtractingHeaders(false);
       }
@@ -88,15 +95,18 @@ export default function ProcessorPage() {
 
   const handleStartStatusDiscovery = async () => {
     setIsDiscoveringStatuses(true);
+    setPageErrorMessage(null);
+    setStatusDiscoveryErrors([]);
     setStatusDiscoveryWarnings([]);
     try {
-      const result = await discoverUniqueStatuses(files, mappings, type as string);
-      setDiscoveredStatuses(result.statuses);
-      setStatusDiscoveryWarnings(result.warnings);
+      const discoveryResult = await discoverUniqueStatuses(files, mappings, type as string);
+      setDiscoveredStatuses(discoveryResult.statuses);
+      setStatusDiscoveryWarnings(discoveryResult.warnings);
+      setStatusDiscoveryErrors(discoveryResult.errors);
       setStep(3);
     } catch (err) {
-      console.error(err);
-      alert('Erro ao analisar status.');
+      const message = err instanceof Error ? err.message : String(err);
+      setPageErrorMessage(`Falha inesperada ao analisar status. ${message}`);
       setStep(4); // Fallback to review
     } finally {
       setIsDiscoveringStatuses(false);
@@ -104,6 +114,7 @@ export default function ProcessorPage() {
   };
 
   const handleProcess = async () => {
+    setPageErrorMessage(null);
     setIsProcessing(true);
     setProcessingStatus({ current: 0, total: files.length, fileName: 'Iniciando...' });
     
@@ -124,8 +135,8 @@ export default function ProcessorPage() {
       setResult(resp);
       setStep(6);
     } catch (err) {
-      alert('Erro ao processar arquivos.');
-      console.error(err);
+      const message = err instanceof Error ? err.message : String(err);
+      setPageErrorMessage(`Falha inesperada ao processar os arquivos. ${message}`);
     } finally {
       setIsProcessing(false);
     }
@@ -159,6 +170,14 @@ export default function ProcessorPage() {
 
   const nextStep = () => setStep(prev => prev + 1);
   const prevStep = () => setStep(prev => prev - 1);
+  const resultErrors = result?.errors ?? [];
+  const resultWarnings = result?.warnings ?? [];
+  const resultHasIssues = resultErrors.length > 0 || resultWarnings.length > 0;
+  const resultIssueRows = [
+    ...resultErrors.map((issue) => ({ severity: 'Erro', ...issue })),
+    ...resultWarnings.map((issue) => ({ severity: 'Aviso', ...issue })),
+  ];
+  const visibleIssueRows = resultIssueRows.slice(0, 8);
 
   return (
     <div className="space-y-16 w-full py-8">
@@ -221,6 +240,34 @@ export default function ProcessorPage() {
           })}
         </div>
       </div>
+
+      {pageErrorMessage && (
+        <div className="rounded-[2rem] border border-rose-100 bg-rose-50/50 px-8 py-6">
+          <div className="flex items-center space-x-3 text-rose-700">
+            <AlertTriangle className="w-5 h-5" />
+            <h4 className="text-technical">Falha Inesperada</h4>
+          </div>
+          <p className="mt-3 text-sm font-medium leading-relaxed text-rose-900">
+            {pageErrorMessage}
+          </p>
+        </div>
+      )}
+
+      {headerExtractionErrors.length > 0 && step < 6 && (
+        <div className="rounded-[2rem] border border-rose-100 bg-rose-50/40 px-8 py-6">
+          <div className="flex items-center space-x-3 text-rose-700">
+            <AlertTriangle className="w-5 h-5" />
+            <h4 className="text-technical">Arquivos com Falha na Leitura de Headers</h4>
+          </div>
+          <div className="mt-4 space-y-3">
+            {headerExtractionErrors.map((issue, index) => (
+              <p key={`${issue.fileName}-${issue.code}-${index}`} className="text-sm font-medium leading-relaxed text-rose-900">
+                {issue.fileName}: {issue.message}
+              </p>
+            ))}
+          </div>
+        </div>
+      )}
       
       {/* LOADING OVERLAY FOR HEADER EXTRACTION */}
       <AnimatePresence>
@@ -402,6 +449,7 @@ export default function ProcessorPage() {
             <div className="space-y-12">
               <StatusNormalizer 
                 discoveredStatuses={discoveredStatuses}
+                errors={statusDiscoveryErrors}
                 warnings={statusDiscoveryWarnings}
                 mappings={statusMappings}
                 onChange={setStatusMappings}
@@ -464,29 +512,54 @@ export default function ProcessorPage() {
 
           {step === 6 && (
             <div className="space-y-16 py-8">
-              <div className="flex flex-col items-center justify-center p-16 glass-card text-center space-y-8 bg-emerald-50/10 border-emerald-100 min-h-[400px]">
+              <div className={`flex flex-col items-center justify-center p-16 glass-card text-center space-y-8 min-h-[400px] ${
+                resultHasIssues ? 'bg-amber-50/20 border-amber-100' : 'bg-emerald-50/10 border-emerald-100'
+              }`}>
                 <div className="relative">
-                  <div className="absolute inset-0 bg-emerald-400 blur-[100px] opacity-10 animate-pulse" />
-                  <div className="relative w-32 h-32 bg-white rounded-[2.5rem] flex items-center justify-center border border-emerald-100 shadow-2xl rotate-6">
-                    <CheckCircle2 className="w-16 h-16 text-emerald-600" />
+                  <div className={`absolute inset-0 blur-[100px] opacity-10 animate-pulse ${
+                    resultHasIssues ? 'bg-amber-400' : 'bg-emerald-400'
+                  }`} />
+                  <div className={`relative w-32 h-32 bg-white rounded-[2.5rem] flex items-center justify-center shadow-2xl rotate-6 ${
+                    resultHasIssues ? 'border border-amber-100' : 'border border-emerald-100'
+                  }`}>
+                    {resultHasIssues ? (
+                      <AlertTriangle className="w-16 h-16 text-amber-600" />
+                    ) : (
+                      <CheckCircle2 className="w-16 h-16 text-emerald-600" />
+                    )}
                   </div>
                 </div>
                 
                 <div className="space-y-2">
-                  <h2 className="text-6xl font-black tracking-tighter text-slate-900 uppercase leading-none">Job Concluído</h2>
-                  <p className="text-technical text-emerald-600 tracking-[0.3em] font-bold uppercase py-2">
+                  <h2 className="text-6xl font-black tracking-tighter text-slate-900 uppercase leading-none">
+                    {resultHasIssues ? 'Concluído com Alertas' : 'Job Concluído'}
+                  </h2>
+                  <p className={`text-technical tracking-[0.3em] font-bold uppercase py-2 ${
+                    resultHasIssues ? 'text-amber-600' : 'text-emerald-600'
+                  }`}>
                     {result?.data?.length || 0} registros normalizados com sucesso
                   </p>
-                  <div className="flex items-center justify-center space-x-2 text-slate-400 mt-4">
-                    <div className="w-1.5 h-1.5 rounded-full bg-slate-200" />
-                    <span className="text-technical">Integridade Estrutural: 100% Verified</span>
-                    <div className="w-1.5 h-1.5 rounded-full bg-slate-200" />
-                  </div>
+                  {resultHasIssues ? (
+                    <div className="flex flex-col items-center justify-center gap-2 text-slate-500 mt-4">
+                      <span className="text-technical">
+                        {resultWarnings.length} avisos
+                      </span>
+                      <span className="text-technical">
+                        {resultErrors.length} erros em arquivo
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center space-x-2 text-slate-400 mt-4">
+                      <div className="w-1.5 h-1.5 rounded-full bg-slate-200" />
+                      <span className="text-technical">Integridade Estrutural: 100% Verified</span>
+                      <div className="w-1.5 h-1.5 rounded-full bg-slate-200" />
+                    </div>
+                  )}
                 </div>
               </div>
 
               {/* DOWNLOAD CENTER */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-8">
                 {/* FINAL DATA */}
                 <div className="glass-card p-12 bg-white border-slate-100 hover:border-purple-200 transition-all duration-500 space-y-8 flex flex-col items-center text-center shadow-sm hover:shadow-2xl hover:shadow-purple-900/5 group">
                   <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center transition-all duration-500 group-hover:bg-purple-600 group-hover:text-white">
@@ -497,7 +570,7 @@ export default function ProcessorPage() {
                     <p className="text-xs text-slate-400 font-medium leading-relaxed">Versão final unificada das bases originais.</p>
                   </div>
                   <button 
-                    onClick={() => downloadCsv(result.data, `consolidado_${type}.csv`)}
+                    onClick={() => downloadCsv(result?.data ?? [], `consolidado_${type}.csv`)}
                     className="premium-button w-full py-5 rounded-2xl text-[10px]"
                   >
                     Baixar Dataset (CSV)
@@ -515,7 +588,7 @@ export default function ProcessorPage() {
                   </div>
                   <button 
                     onClick={() => {
-                      const logData = result.logs.map((l) => ({
+                      const logData = (result?.logs ?? []).map((l) => ({
                         "Arquivo": l.arquivo,
                         "Coluna Origem": l.origem,
                         "Destino Final": l.destino,
@@ -526,6 +599,36 @@ export default function ProcessorPage() {
                     className="w-full py-5 bg-slate-50 hover:bg-slate-100 text-slate-900 rounded-2xl text-technical border border-slate-100 transition-all"
                   >
                     Baixar Relatório
+                  </button>
+                </div>
+
+                <div className="glass-card p-12 bg-white border-slate-100 hover:border-amber-200 transition-all duration-500 space-y-8 flex flex-col items-center text-center shadow-sm group">
+                  <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center transition-all duration-500 group-hover:bg-amber-500 group-hover:text-white">
+                    <AlertTriangle className="w-8 h-8" />
+                  </div>
+                  <div>
+                    <h4 className="text-technical text-slate-900 mb-2">Errors & Warnings</h4>
+                    <p className="text-xs text-slate-400 font-medium leading-relaxed">
+                      Relatório estruturado com arquivo, linha, coluna e valor bruto.
+                    </p>
+                  </div>
+                  <button 
+                    onClick={() => {
+                      const issueData = resultIssueRows.map((issue) => ({
+                        severity: issue.severity,
+                        fileName: issue.fileName,
+                        code: issue.code,
+                        message: issue.message,
+                        row: issue.row ?? '',
+                        column: issue.column ?? '',
+                        rawValue: issue.rawValue === undefined ? '' : String(issue.rawValue),
+                      }));
+                      downloadCsv(issueData, `issues_${type}.csv`);
+                    }}
+                    disabled={resultIssueRows.length === 0}
+                    className="w-full py-5 bg-amber-50/50 hover:bg-amber-50 text-amber-700 rounded-2xl text-technical border border-amber-100 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    Baixar Issues
                   </button>
                 </div>
 
@@ -554,6 +657,48 @@ export default function ProcessorPage() {
                   </div>
                 )}
               </div>
+
+              {resultIssueRows.length > 0 && (
+                <div className="glass-card bg-white border-slate-100 p-10 space-y-6">
+                  <div className="flex items-center space-x-3 text-slate-900">
+                    <AlertTriangle className="w-5 h-5 text-amber-600" />
+                    <h4 className="text-technical">Ocorrências do Processamento</h4>
+                  </div>
+                  <div className="space-y-4">
+                    {visibleIssueRows.map((issue, index) => (
+                      <div key={`${issue.severity}-${issue.fileName}-${issue.code}-${index}`} className="rounded-[1.75rem] border border-slate-100 bg-slate-50/50 px-6 py-5">
+                        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                          <div className="space-y-1">
+                            <p className="text-sm font-bold text-slate-900">
+                              {issue.fileName}
+                            </p>
+                            <p className="text-xs font-medium uppercase tracking-wider text-slate-400">
+                              {issue.severity} · {issue.code}
+                            </p>
+                          </div>
+                          <div className="flex flex-wrap gap-3 text-[11px] font-medium text-slate-500">
+                            {issue.row !== undefined && <span>Linha {issue.row}</span>}
+                            {issue.column && <span>Coluna {issue.column}</span>}
+                          </div>
+                        </div>
+                        <p className="mt-3 text-sm font-medium leading-relaxed text-slate-600">
+                          {issue.message}
+                        </p>
+                        {issue.rawValue !== undefined && (
+                          <p className="mt-2 text-xs font-medium leading-relaxed text-slate-400">
+                            Valor bruto: {String(issue.rawValue)}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                    {resultIssueRows.length > visibleIssueRows.length && (
+                      <p className="text-sm font-medium text-slate-400">
+                        Exibindo {visibleIssueRows.length} de {resultIssueRows.length} ocorrências. Baixe o relatório completo para ver todas.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
 
               <div className="flex justify-center pt-8">
                 <button 

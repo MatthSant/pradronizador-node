@@ -31,15 +31,16 @@ describe("extractFileHeaders", () => {
       "duplicado.csv"
     );
 
-    const metadata = await extractFileHeaders([file]);
+    const result = await extractFileHeaders([file]);
     const fileKey = getFileKey(file);
 
-    expect(metadata[fileKey].headers).toEqual(["Email", "Email_2", "Nome"]);
-    expect(metadata[fileKey].samples).toEqual({
+    expect(result.metadata[fileKey].headers).toEqual(["Email", "Email_2", "Nome"]);
+    expect(result.metadata[fileKey].samples).toEqual({
       Email: ["primeiro@example.com"],
       Email_2: ["segundo@example.com"],
       Nome: ["Ana"],
     });
+    expect(result.errors).toEqual([]);
   });
 
   it("preserves duplicate XLSX headers and samples with unique names", async () => {
@@ -48,15 +49,16 @@ describe("extractFileHeaders", () => {
       "duplicado.xlsx"
     );
 
-    const metadata = await extractFileHeaders([file]);
+    const result = await extractFileHeaders([file]);
     const fileKey = getFileKey(file);
 
-    expect(metadata[fileKey].headers).toEqual(["Email", "Email_2", "Nome"]);
-    expect(metadata[fileKey].samples).toEqual({
+    expect(result.metadata[fileKey].headers).toEqual(["Email", "Email_2", "Nome"]);
+    expect(result.metadata[fileKey].samples).toEqual({
       Email: ["primeiro@example.com"],
       Email_2: ["segundo@example.com"],
       Nome: ["Ana"],
     });
+    expect(result.errors).toEqual([]);
   });
 });
 
@@ -68,7 +70,7 @@ describe("processFiles", () => {
     );
     const metadata = await extractFileHeaders([file]);
     const fileKey = getFileKey(file);
-    const headers = metadata[fileKey].headers;
+    const headers = metadata.metadata[fileKey].headers;
 
     const result = await processFiles(
       [file],
@@ -89,6 +91,8 @@ describe("processFiles", () => {
         idform: "preview-e-processamento.csv",
       },
     ]);
+    expect(result.errors).toEqual([]);
+    expect(result.warnings).toEqual([]);
   });
 
   it("preserves duplicate XLSX headers in final processing", async () => {
@@ -117,6 +121,8 @@ describe("processFiles", () => {
         idform: "duplicado.xlsx",
       },
     ]);
+    expect(result.errors).toEqual([]);
+    expect(result.warnings).toEqual([]);
   });
 
   it("keeps mappings and fixed values isolated for files with the same name", async () => {
@@ -149,6 +155,138 @@ describe("processFiles", () => {
         idform: "dados.csv",
       },
     ]);
+    expect(result.errors).toEqual([]);
+  });
+
+  it("records invalid dates and uses the next valid normalized source", async () => {
+    const file = createCsvFile(
+      "Data Inicial,Data Final\n31/02/2024,21/03/2024",
+      "datas.csv"
+    );
+    const fileKey = getFileKey(file);
+
+    const result = await processFiles(
+      [file],
+      {
+        [fileKey]: {
+          "Data Inicial": "data",
+          "Data Final": "data",
+        },
+      },
+      { [fileKey]: {} },
+      "transactions"
+    );
+
+    expect(result.data).toEqual([
+      {
+        data: "2024-03-21 00:00:00",
+        idform: "datas.csv",
+      },
+    ]);
+    expect(result.warnings).toEqual([
+      expect.objectContaining({
+        fileName: "datas.csv",
+        code: "INVALID_DATE",
+        row: 2,
+        column: "Data Inicial",
+        rawValue: "31/02/2024",
+      }),
+    ]);
+  });
+
+  it("ignores a source emptied by normalization and keeps the next valid value", async () => {
+    const file = createCsvFile(
+      "Nome 1,Nome 2\n🔥,João Ávila",
+      "nomes.csv"
+    );
+    const fileKey = getFileKey(file);
+
+    const result = await processFiles(
+      [file],
+      {
+        [fileKey]: {
+          "Nome 1": "field_name",
+          "Nome 2": "field_name",
+        },
+      },
+      { [fileKey]: {} },
+      "events"
+    );
+
+    expect(result.data).toEqual([
+      {
+        field_name: "João Ávila",
+        idform: "nomes.csv",
+      },
+    ]);
+    expect(result.warnings).toEqual([]);
+  });
+
+  it("records mapping conflicts and keeps the first normalized value", async () => {
+    const file = createCsvFile(
+      "Nome Principal,Nome Secundário\nAna,Maria",
+      "conflito.csv"
+    );
+    const fileKey = getFileKey(file);
+
+    const result = await processFiles(
+      [file],
+      {
+        [fileKey]: {
+          "Nome Principal": "field_name",
+          "Nome Secundário": "field_name",
+        },
+      },
+      { [fileKey]: {} },
+      "events"
+    );
+
+    expect(result.data).toEqual([
+      {
+        field_name: "Ana",
+        idform: "conflito.csv",
+      },
+    ]);
+    expect(result.warnings).toEqual([
+      expect.objectContaining({
+        fileName: "conflito.csv",
+        code: "MAPPING_CONFLICT",
+        row: 2,
+        column: "field_name",
+        rawValue: "Nome Principal=Ana | Nome Secundário=Maria",
+      }),
+    ]);
+  });
+
+  it("records file read errors instead of failing silently", async () => {
+    const file = createCsvFile("Nome\nAna", "erro.csv");
+    const fileKey = getFileKey(file);
+    const parseSpy = vi.spyOn(Papa, "parse").mockImplementation((_, config) => {
+      config?.error?.(new Error("csv parse failed"), "" as never, null);
+      return {} as Papa.Parser;
+    });
+
+    const result = await processFiles(
+      [file],
+      {
+        [fileKey]: {
+          Nome: "field_name",
+        },
+      },
+      { [fileKey]: {} },
+      "events"
+    );
+
+    expect(result.data).toEqual([]);
+    expect(result.errors).toEqual([
+      expect.objectContaining({
+        fileName: "erro.csv",
+        code: "CSV_PARSE_ERROR",
+        message: "csv parse failed",
+      }),
+    ]);
+
+    parseSpy.mockRestore();
   });
 });
 
@@ -172,6 +310,7 @@ describe("discoverUniqueStatuses", () => {
 
     expect(result.statuses).toEqual(["aprovado", "reembolsado"]);
     expect(result.warnings).toEqual([]);
+    expect(result.errors).toEqual([]);
   });
 
   it("stops scanning and returns a warning after the configured row limit", async () => {
@@ -194,12 +333,43 @@ describe("discoverUniqueStatuses", () => {
 
     expect(result.statuses).toEqual(["pendente_0", "pendente_1"]);
     expect(result.warnings).toEqual([
-      {
+      expect.objectContaining({
         fileName: "status-limit.csv",
         code: "STATUS_SCAN_LIMIT",
         message: "A coleta de status foi interrompida após 5000 linhas analisadas.",
-      },
+      }),
     ]);
+    expect(result.errors).toEqual([]);
+  });
+
+  it("returns structured errors when status discovery cannot read a file", async () => {
+    const file = createCsvFile("Status\npendente", "status-erro.csv");
+    const fileKey = getFileKey(file);
+    const parseSpy = vi.spyOn(Papa, "parse").mockImplementation((_, config) => {
+      config?.error?.(new Error("csv parse failed"), "" as never, null);
+      return {} as Papa.Parser;
+    });
+
+    const result = await discoverUniqueStatuses(
+      [file],
+      {
+        [fileKey]: {
+          Status: "field_transaction_status",
+        },
+      },
+      "transactions"
+    );
+
+    expect(result.statuses).toEqual([]);
+    expect(result.warnings).toEqual([]);
+    expect(result.errors).toEqual([
+      expect.objectContaining({
+        fileName: "status-erro.csv",
+        code: "CSV_PARSE_ERROR",
+      }),
+    ]);
+
+    parseSpy.mockRestore();
   });
 });
 
@@ -214,7 +384,13 @@ describe("parser hardening", () => {
     const fileKey = getFileKey(file);
     const failedMetadata = await extractFileHeaders([file]);
 
-    expect(failedMetadata[fileKey]).toEqual({ headers: [], samples: {} });
+    expect(failedMetadata.metadata[fileKey]).toEqual({ headers: [], samples: {} });
+    expect(failedMetadata.errors).toEqual([
+      expect.objectContaining({
+        fileName: "erro.csv",
+        code: "HEADER_EXTRACTION_ERROR",
+      }),
+    ]);
     parseSpy.mockRestore();
   });
 });
