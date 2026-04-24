@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { FIELD_DESCRIPTIONS, HARD_MAPPINGS } from '@/lib/constants';
 import { AlertCircle, ChevronRight, FileStack, Sparkles, Ban, ListFilter, Trash2, RotateCcw, Info, CheckCircle, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -32,42 +32,11 @@ export const MappingInterface: React.FC<MappingInterfaceProps> = ({
   onMappingChange, 
   onAddCustomField 
 }) => {
-  const [mappings, setMappings] = useState<Record<string, string>>({});
-  const [creatingForCol, setCreatingForCol] = useState<string | null>(null);
-  const [newLabel, setNewLabel] = useState('');
-  const [hoveredCol, setHoveredCol] = useState<string | null>(null);
-  const lastSyncRef = useRef<{
-    fileKey: string;
-    sourceSignature: string;
-    initialMappingsSignature: string;
-  } | null>(null);
-  
-  const targetOptions = useMemo(() => [
-    { id: '__NONE__', name: '(Não Mapear)' },
-    ...(onAddCustomField ? [{ id: '__CREATE__', name: '+ Criar Novo Campo Customizado...' }] : []),
-    ...Object.entries(FIELD_DESCRIPTIONS)
-      .filter(([, meta]) => meta.category === 'global' || meta.category === type)
-      .map(([id, meta]) => ({
-        id,
-        name: `${meta.name}`
-      })),
-    ...Object.entries(customFieldLabels).map(([id, label]) => ({
-      id,
-      name: label.toUpperCase()
-    }))
-  ], [type, onAddCustomField, customFieldLabels]);
-
   const safeSourceColumns = useMemo(() => {
     return Array.from(new Set(sourceColumns.filter(c => c && c.trim().length > 0)));
   }, [sourceColumns]);
 
-  const sourceColumnsSignature = useMemo(() => safeSourceColumns.join('\u0001'), [safeSourceColumns]);
-  const initialMappingsSignature = useMemo(
-    () => JSON.stringify(Object.entries(initialMappings).sort(([left], [right]) => left.localeCompare(right))),
-    [initialMappings]
-  );
-
-  const buildInitialMappings = useMemo(() => {
+  const buildMappingsSnapshot = useCallback(() => {
     const initialMappingsPreserved: Record<string, string> = {};
 
     safeSourceColumns.forEach(col => {
@@ -87,6 +56,37 @@ export const MappingInterface: React.FC<MappingInterfaceProps> = ({
     return initialMappingsPreserved;
   }, [initialMappings, safeSourceColumns, type]);
 
+  const [mappings, setMappings] = useState<Record<string, string>>(() => buildMappingsSnapshot());
+  const [creatingForCol, setCreatingForCol] = useState<string | null>(null);
+  const [newLabel, setNewLabel] = useState('');
+  const [hoveredCol, setHoveredCol] = useState<string | null>(null);
+  const lastSyncRef = useRef<{
+    fileKey: string;
+    sourceSignature: string;
+    initialMappingsSignature: string;
+  } | null>(null);
+
+  const targetOptions = useMemo(() => [
+    { id: '__NONE__', name: '(Não Mapear)' },
+    ...(onAddCustomField ? [{ id: '__CREATE__', name: '+ Criar Novo Campo Customizado...' }] : []),
+    ...Object.entries(FIELD_DESCRIPTIONS)
+      .filter(([, meta]) => meta.category === 'global' || meta.category === type)
+      .map(([id, meta]) => ({
+        id,
+        name: `${meta.name}`
+      })),
+    ...Object.entries(customFieldLabels).map(([id, label]) => ({
+      id,
+      name: label.toUpperCase()
+    }))
+  ], [type, onAddCustomField, customFieldLabels]);
+
+  const sourceColumnsSignature = useMemo(() => safeSourceColumns.join('\u0001'), [safeSourceColumns]);
+  const initialMappingsSignature = useMemo(
+    () => JSON.stringify(Object.entries(initialMappings).sort(([left], [right]) => left.localeCompare(right))),
+    [initialMappings]
+  );
+
   useEffect(() => {
     const lastSync = lastSyncRef.current;
     const shouldSync =
@@ -103,11 +103,12 @@ export const MappingInterface: React.FC<MappingInterfaceProps> = ({
       const currentSignature = JSON.stringify(
         Object.entries(currentMappings).sort(([left], [right]) => left.localeCompare(right))
       );
+      const nextMappings = buildMappingsSnapshot();
       const nextSignature = JSON.stringify(
-        Object.entries(buildInitialMappings).sort(([left], [right]) => left.localeCompare(right))
+        Object.entries(nextMappings).sort(([left], [right]) => left.localeCompare(right))
       );
 
-      return currentSignature === nextSignature ? currentMappings : buildInitialMappings;
+      return currentSignature === nextSignature ? currentMappings : nextMappings;
     });
 
     lastSyncRef.current = {
@@ -115,7 +116,7 @@ export const MappingInterface: React.FC<MappingInterfaceProps> = ({
       sourceSignature: sourceColumnsSignature,
       initialMappingsSignature,
     };
-  }, [activeFileKey, buildInitialMappings, initialMappingsSignature, sourceColumnsSignature]);
+  }, [activeFileKey, buildMappingsSnapshot, initialMappingsSignature, sourceColumnsSignature]);
 
   const groups = useMemo(() => {
     const pending: string[] = [];
