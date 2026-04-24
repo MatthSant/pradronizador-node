@@ -4,6 +4,7 @@ import * as XLSX from "xlsx";
 import { describe, expect, it, vi } from "vitest";
 import Papa from "papaparse";
 
+import { getFileKey } from "./files";
 import { discoverUniqueStatuses, extractFileHeaders, processFiles } from "./processor";
 
 function createCsvFile(content: string, name: string): File {
@@ -31,9 +32,10 @@ describe("extractFileHeaders", () => {
     );
 
     const metadata = await extractFileHeaders([file]);
+    const fileKey = getFileKey(file);
 
-    expect(metadata["duplicado.csv"].headers).toEqual(["Email", "Email_2", "Nome"]);
-    expect(metadata["duplicado.csv"].samples).toEqual({
+    expect(metadata[fileKey].headers).toEqual(["Email", "Email_2", "Nome"]);
+    expect(metadata[fileKey].samples).toEqual({
       Email: ["primeiro@example.com"],
       Email_2: ["segundo@example.com"],
       Nome: ["Ana"],
@@ -47,9 +49,10 @@ describe("extractFileHeaders", () => {
     );
 
     const metadata = await extractFileHeaders([file]);
+    const fileKey = getFileKey(file);
 
-    expect(metadata["duplicado.xlsx"].headers).toEqual(["Email", "Email_2", "Nome"]);
-    expect(metadata["duplicado.xlsx"].samples).toEqual({
+    expect(metadata[fileKey].headers).toEqual(["Email", "Email_2", "Nome"]);
+    expect(metadata[fileKey].samples).toEqual({
       Email: ["primeiro@example.com"],
       Email_2: ["segundo@example.com"],
       Nome: ["Ana"],
@@ -64,17 +67,18 @@ describe("processFiles", () => {
       "preview-e-processamento.csv"
     );
     const metadata = await extractFileHeaders([file]);
-    const headers = metadata["preview-e-processamento.csv"].headers;
+    const fileKey = getFileKey(file);
+    const headers = metadata[fileKey].headers;
 
     const result = await processFiles(
       [file],
       {
-        "preview-e-processamento.csv": {
+        [fileKey]: {
           [headers[0]]: "field_email",
           [headers[1]]: "field_name",
         },
       },
-      { "preview-e-processamento.csv": {} },
+      { [fileKey]: {} },
       "events"
     );
 
@@ -92,16 +96,17 @@ describe("processFiles", () => {
       [["Email", "Email", "Nome"], ["Primeiro@Example.com", "segundo valor", "Ana"]],
       "duplicado.xlsx"
     );
+    const fileKey = getFileKey(file);
 
     const result = await processFiles(
       [file],
       {
-        "duplicado.xlsx": {
+        [fileKey]: {
           Email: "field_email",
           Email_2: "field_name",
         },
       },
-      { "duplicado.xlsx": {} },
+      { [fileKey]: {} },
       "events"
     );
 
@@ -113,6 +118,38 @@ describe("processFiles", () => {
       },
     ]);
   });
+
+  it("keeps mappings and fixed values isolated for files with the same name", async () => {
+    const firstFile = createCsvFile("Nome\nAna", "dados.csv");
+    const secondFile = createCsvFile("Nome\nBruno", "dados.csv");
+    const firstFileKey = getFileKey(firstFile);
+    const secondFileKey = getFileKey(secondFile);
+
+    const result = await processFiles(
+      [firstFile, secondFile],
+      {
+        [firstFileKey]: { Nome: "field_name" },
+        [secondFileKey]: {},
+      },
+      {
+        [firstFileKey]: { field_source: "arquivo_1" },
+        [secondFileKey]: { field_source: "arquivo_2" },
+      },
+      "events"
+    );
+
+    expect(result.data).toEqual([
+      {
+        field_name: "Ana",
+        field_source: "arquivo_1",
+        idform: "dados.csv",
+      },
+      {
+        field_source: "arquivo_2",
+        idform: "dados.csv",
+      },
+    ]);
+  });
 });
 
 describe("discoverUniqueStatuses", () => {
@@ -121,11 +158,12 @@ describe("discoverUniqueStatuses", () => {
       "Status,Status\npendente,aprovado\ncancelado,reembolsado",
       "status.csv"
     );
+    const fileKey = getFileKey(file);
 
     const result = await discoverUniqueStatuses(
       [file],
       {
-        "status.csv": {
+        [fileKey]: {
           Status_2: "field_transaction_status",
         },
       },
@@ -142,11 +180,12 @@ describe("discoverUniqueStatuses", () => {
       `Status\n${rows.join("\n")}`,
       "status-limit.csv"
     );
+    const fileKey = getFileKey(file);
 
     const result = await discoverUniqueStatuses(
       [file],
       {
-        "status-limit.csv": {
+        [fileKey]: {
           Status: "field_transaction_status",
         },
       },
@@ -171,9 +210,11 @@ describe("parser hardening", () => {
       return {} as Papa.Parser;
     });
 
-    const metadata = await extractFileHeaders([createCsvFile("qualquer", "erro.csv")]);
+    const file = createCsvFile("qualquer", "erro.csv");
+    const fileKey = getFileKey(file);
+    const failedMetadata = await extractFileHeaders([file]);
 
-    expect(metadata["erro.csv"]).toEqual({ headers: [], samples: {} });
+    expect(failedMetadata[fileKey]).toEqual({ headers: [], samples: {} });
     parseSpy.mockRestore();
   });
 });
