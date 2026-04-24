@@ -397,6 +397,7 @@ export default function ProcessorPage() {
             <div className="space-y-12">
               {activeMappingFile && activeMappingFileKey && (
                 <MappingInterface 
+                  key={activeMappingFileKey}
                   activeFileKey={activeMappingFileKey}
                   activeFileName={activeMappingFile.name}
                   fileIndex={activeMappingFileIdx}
