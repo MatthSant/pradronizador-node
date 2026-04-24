@@ -1,5 +1,8 @@
 import { TRANS_STATUS_MAP } from "./constants";
 
+const EMOJI_REGEX =
+  /(?:\p{Extended_Pictographic}|\p{Regional_Indicator}|[#*0-9]\uFE0F?\u20E3)/gu;
+
 /**
  * Normalizes a string for fuzzy matching: 
  * Removes accents, non-alphanumeric chars, and converts to lowercase.
@@ -13,16 +16,19 @@ export function normalizeString(s: string): string {
     .replace(/[^a-z0-9]/g, "");
 }
 
-/**
- * Cleans surrogates and replaces invalid UTF-8 characters.
- */
-export function cleanSurrogates(s: any): any {
-  if (typeof s !== "string") return s;
-  return s.replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, (match) => {
-    // Keep valid surrogates, or replace if they are truly broken
-    return match; 
-  }).replace(/[^\x20-\x7E\xA0-\xFF\u0100-\u017F\u0180-\u024F]/g, " ");
+export function sanitizeText(value: unknown): unknown {
+  if (typeof value !== "string") return value;
+
+  return value
+    .replace(/^\uFEFF/, "")
+    .replace(EMOJI_REGEX, " ")
+    .replace(/[\uFE0E\uFE0F\u200D]/g, "")
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
+
+export const cleanSurrogates = sanitizeText;
 
 export function cleanEmail(email: string): string {
   if (!email) return "";
@@ -37,59 +43,105 @@ export function mapStatus(status: string): string {
 
 /**
  * Normalizes various date formats into Postgres-compatible YYYY-MM-DD HH:mm:ss.
- * Handles DD/MM/YYYY, YYYY-MM-DD, and variants.
- */
-/**
- * Normalizes various date formats into Postgres-compatible YYYY-MM-DD HH:mm:ss.
  * Handles DD/MM/YYYY, YYYY-MM-DD, and native Date objects.
  */
-export function normalizeDate(dateVal: any): string {
+function formatDateTimeParts(
+  year: number,
+  month: number,
+  day: number,
+  hours = 0,
+  minutes = 0,
+  seconds = 0
+): string {
+  const yyyy = String(year).padStart(4, "0");
+  const mm = String(month).padStart(2, "0");
+  const dd = String(day).padStart(2, "0");
+  const hh = String(hours).padStart(2, "0");
+  const min = String(minutes).padStart(2, "0");
+  const ss = String(seconds).padStart(2, "0");
+
+  return `${yyyy}-${mm}-${dd} ${hh}:${min}:${ss}`;
+}
+
+function isValidDateParts(year: number, month: number, day: number): boolean {
+  const date = new Date(year, month - 1, day);
+
+  return (
+    date.getFullYear() === year &&
+    date.getMonth() === month - 1 &&
+    date.getDate() === day
+  );
+}
+
+function isValidTimeParts(hours: number, minutes: number, seconds: number): boolean {
+  return (
+    hours >= 0 &&
+    hours <= 23 &&
+    minutes >= 0 &&
+    minutes <= 59 &&
+    seconds >= 0 &&
+    seconds <= 59
+  );
+}
+
+export function normalizeDate(dateVal: unknown): string {
   if (!dateVal) return "";
 
-  // 1. Handle Native Date Objects directly to preserve time
   if (dateVal instanceof Date) {
     if (isNaN(dateVal.getTime())) return "";
-    const y = dateVal.getFullYear();
-    const m = String(dateVal.getMonth() + 1).padStart(2, '0');
-    const d = String(dateVal.getDate()).padStart(2, '0');
-    const hh = String(dateVal.getHours()).padStart(2, '0');
-    const mm = String(dateVal.getMinutes()).padStart(2, '0');
-    const ss = String(dateVal.getSeconds()).padStart(2, '0');
-    return `${y}-${m}-${d} ${hh}:${mm}:${ss}`;
+
+    return formatDateTimeParts(
+      dateVal.getFullYear(),
+      dateVal.getMonth() + 1,
+      dateVal.getDate(),
+      dateVal.getHours(),
+      dateVal.getMinutes(),
+      dateVal.getSeconds()
+    );
   }
 
-  const s = String(dateVal).trim();
-  if (!s) return "";
+  const value = String(dateVal).trim();
+  if (!value) return "";
 
-  // 2. ISO-ish format (YYYY-MM-DD)
-  // Matches: 2024-03-21, 2024-03-21 15:30, 2024-03-21 15:30:45
-  const isoMatch = s.match(/^(\d{4})[-/](\d{2})[-/](\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?/);
+  const isoMatch = value.match(
+    /^(\d{4})[-/](\d{1,2})[-/](\d{1,2})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?$/
+  );
   if (isoMatch) {
-    const [_, y, m, d, hh = "00", mm = "00", ss = "00"] = isoMatch;
-    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')} ${hh}:${mm}:${ss}`;
-  }
+    const [, yearRaw, monthRaw, dayRaw, hoursRaw = "00", minutesRaw = "00", secondsRaw = "00"] =
+      isoMatch;
+    const year = Number(yearRaw);
+    const month = Number(monthRaw);
+    const day = Number(dayRaw);
+    const hours = Number(hoursRaw);
+    const minutes = Number(minutesRaw);
+    const seconds = Number(secondsRaw);
 
-  // 3. BR format (DD/MM/YYYY)
-  // Matches: 21/03/2024, 21/03/2024 15:30
-  const brMatch = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?/);
-  if (brMatch) {
-    const [_, d, m, y, hh = "00", mm = "00", ss = "00"] = brMatch;
-    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')} ${hh}:${mm}:${ss}`;
-  }
-
-  // 4. Fallback: Native Date parsing
-  try {
-    const d = new Date(s);
-    if (!isNaN(d.getTime())) {
-      const year = d.getFullYear();
-      const month = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      const hh = String(d.getHours()).padStart(2, '0');
-      const mm = String(d.getMinutes()).padStart(2, '0');
-      const ss = String(d.getSeconds()).padStart(2, '0');
-      return `${year}-${month}-${day} ${hh}:${mm}:${ss}`;
+    if (!isValidDateParts(year, month, day) || !isValidTimeParts(hours, minutes, seconds)) {
+      return "";
     }
-  } catch (e) {}
 
-  return s; 
+    return formatDateTimeParts(year, month, day, hours, minutes, seconds);
+  }
+
+  const brMatch = value.match(
+    /^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?$/
+  );
+  if (brMatch) {
+    const [, dayRaw, monthRaw, yearRaw, hoursRaw = "00", minutesRaw = "00", secondsRaw = "00"] =
+      brMatch;
+    const year = Number(yearRaw);
+    const month = Number(monthRaw);
+    const day = Number(dayRaw);
+    const hours = Number(hoursRaw);
+    const minutes = Number(minutesRaw);
+    const seconds = Number(secondsRaw);
+
+    if (!isValidDateParts(year, month, day) || !isValidTimeParts(hours, minutes, seconds)) {
+      return "";
+    }
+
+    return formatDateTimeParts(year, month, day, hours, minutes, seconds);
+  }
+
+  return "";
 }
