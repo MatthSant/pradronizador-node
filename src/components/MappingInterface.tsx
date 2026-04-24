@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { FIELD_DESCRIPTIONS, HARD_MAPPINGS } from '@/lib/constants';
-import { Check, AlertCircle, ChevronRight, FileStack, X, Sparkles, Ban, ListFilter, Trash2, RotateCcw, Info, CheckCircle } from 'lucide-react';
+import { AlertCircle, ChevronRight, FileStack, Sparkles, Ban, ListFilter, Trash2, RotateCcw, Info, CheckCircle, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface MappingInterfaceProps {
+  activeFileKey: string;
   activeFileName: string;
   fileIndex: number;
   totalFiles: number;
@@ -19,6 +20,7 @@ interface MappingInterfaceProps {
 }
 
 export const MappingInterface: React.FC<MappingInterfaceProps> = ({ 
+  activeFileKey,
   activeFileName,
   fileIndex,
   totalFiles,
@@ -34,19 +36,24 @@ export const MappingInterface: React.FC<MappingInterfaceProps> = ({
   const [creatingForCol, setCreatingForCol] = useState<string | null>(null);
   const [newLabel, setNewLabel] = useState('');
   const [hoveredCol, setHoveredCol] = useState<string | null>(null);
+  const lastSyncRef = useRef<{
+    fileKey: string;
+    sourceSignature: string;
+    initialMappingsSignature: string;
+  } | null>(null);
   
   const targetOptions = useMemo(() => [
     { id: '__NONE__', name: '(Não Mapear)' },
     ...(onAddCustomField ? [{ id: '__CREATE__', name: '+ Criar Novo Campo Customizado...' }] : []),
     ...Object.entries(FIELD_DESCRIPTIONS)
-      .filter(([_, meta]) => meta.category === 'global' || meta.category === type)
+      .filter(([, meta]) => meta.category === 'global' || meta.category === type)
       .map(([id, meta]) => ({
         id,
         name: `${meta.name}`
       })),
     ...Object.entries(customFieldLabels).map(([id, label]) => ({
       id,
-      name: `🟡 ${label.toUpperCase()}`
+      name: label.toUpperCase()
     }))
   ], [type, onAddCustomField, customFieldLabels]);
 
@@ -54,21 +61,61 @@ export const MappingInterface: React.FC<MappingInterfaceProps> = ({
     return Array.from(new Set(sourceColumns.filter(c => c && c.trim().length > 0)));
   }, [sourceColumns]);
 
-  useEffect(() => {
+  const sourceColumnsSignature = useMemo(() => safeSourceColumns.join('\u0001'), [safeSourceColumns]);
+  const initialMappingsSignature = useMemo(
+    () => JSON.stringify(Object.entries(initialMappings).sort(([left], [right]) => left.localeCompare(right))),
+    [initialMappings]
+  );
+
+  const buildInitialMappings = useMemo(() => {
     const initialMappingsPreserved: Record<string, string> = {};
-    sourceColumns.forEach(col => {
+
+    safeSourceColumns.forEach(col => {
       if (initialMappings[col] && initialMappings[col] !== '__NONE__') {
         initialMappingsPreserved[col] = initialMappings[col];
         return;
       }
+
       if (type === 'transactions' && HARD_MAPPINGS[col]) {
         initialMappingsPreserved[col] = HARD_MAPPINGS[col];
         return;
       }
+
       initialMappingsPreserved[col] = '__NONE__';
     });
-    setMappings(initialMappingsPreserved);
-  }, [activeFileName, sourceColumns, type]); 
+
+    return initialMappingsPreserved;
+  }, [initialMappings, safeSourceColumns, type]);
+
+  useEffect(() => {
+    const lastSync = lastSyncRef.current;
+    const shouldSync =
+      !lastSync ||
+      lastSync.fileKey !== activeFileKey ||
+      lastSync.sourceSignature !== sourceColumnsSignature ||
+      lastSync.initialMappingsSignature !== initialMappingsSignature;
+
+    if (!shouldSync) {
+      return;
+    }
+
+    setMappings((currentMappings) => {
+      const currentSignature = JSON.stringify(
+        Object.entries(currentMappings).sort(([left], [right]) => left.localeCompare(right))
+      );
+      const nextSignature = JSON.stringify(
+        Object.entries(buildInitialMappings).sort(([left], [right]) => left.localeCompare(right))
+      );
+
+      return currentSignature === nextSignature ? currentMappings : buildInitialMappings;
+    });
+
+    lastSyncRef.current = {
+      fileKey: activeFileKey,
+      sourceSignature: sourceColumnsSignature,
+      initialMappingsSignature,
+    };
+  }, [activeFileKey, buildInitialMappings, initialMappingsSignature, sourceColumnsSignature]);
 
   const groups = useMemo(() => {
     const pending: string[] = [];
@@ -120,7 +167,7 @@ export const MappingInterface: React.FC<MappingInterfaceProps> = ({
     }
   };
 
-  const renderColumnRow = (col: string, idx: number) => (
+  const renderColumnRow = (col: string) => (
     <motion.div 
       key={col} 
       layout
@@ -262,7 +309,7 @@ export const MappingInterface: React.FC<MappingInterfaceProps> = ({
                 Mapeando
               </h2>
               <span className="text-xl font-bold text-purple-600 italic truncate max-w-lg" title={activeFileName}>
-                "{activeFileName}"
+                &quot;{activeFileName}&quot;
               </span>
             </div>
             <p className="text-slate-500 text-sm font-medium max-w-2xl leading-relaxed">
@@ -309,7 +356,7 @@ export const MappingInterface: React.FC<MappingInterfaceProps> = ({
               </div>
             </div>
             <div className="p-10 space-y-6 max-h-[600px] overflow-y-auto custom-scrollbar">
-              {groups.pending.map((col, idx) => renderColumnRow(col, idx))}
+              {groups.pending.map((col) => renderColumnRow(col))}
             </div>
           </motion.div>
         )}
@@ -331,7 +378,7 @@ export const MappingInterface: React.FC<MappingInterfaceProps> = ({
                 </div>
               </div>
               <div className="p-8 space-y-6 max-h-[600px] overflow-y-auto custom-scrollbar">
-                {groups.mapped.map((col, idx) => renderColumnRow(col, idx))}
+                {groups.mapped.map((col) => renderColumnRow(col))}
               </div>
             </motion.div>
           )}
@@ -352,7 +399,7 @@ export const MappingInterface: React.FC<MappingInterfaceProps> = ({
                 </div>
               </div>
               <div className="p-8 space-y-6 max-h-[600px] overflow-y-auto custom-scrollbar grayscale opacity-60">
-                {groups.skipped.map((col, idx) => renderColumnRow(col, idx))}
+                {groups.skipped.map((col) => renderColumnRow(col))}
               </div>
             </motion.div>
           )}

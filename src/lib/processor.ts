@@ -392,7 +392,13 @@ export async function processFiles(
       });
 
       Object.entries(fileFixedValues).forEach(([target, value]) => {
-        if (!newRow[target] || String(newRow[target]).trim() === "") {
+        const currentValue = newRow[target];
+
+        if (
+          currentValue === undefined ||
+          currentValue === null ||
+          String(currentValue).trim() === ""
+        ) {
           newRow[target] = value;
         }
       });

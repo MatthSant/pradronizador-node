@@ -288,6 +288,35 @@ describe("processFiles", () => {
 
     parseSpy.mockRestore();
   });
+
+  it("does not overwrite a legitimate zero with a fixed value", async () => {
+    const file = createCsvFile("Quantidade\n0", "zero.csv");
+    const fileKey = getFileKey(file);
+
+    const result = await processFiles(
+      [file],
+      {
+        [fileKey]: {
+          Quantidade: "field_quantity",
+        },
+      },
+      {
+        [fileKey]: {
+          field_quantity: "fallback",
+        },
+      },
+      "events"
+    );
+
+    expect(result.data).toEqual([
+      {
+        field_quantity: "0",
+        idform: "zero.csv",
+      },
+    ]);
+    expect(result.errors).toEqual([]);
+    expect(result.warnings).toEqual([]);
+  });
 });
 
 describe("discoverUniqueStatuses", () => {
