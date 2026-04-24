@@ -12,9 +12,29 @@ export interface MappingLog {
   status: "MAPEADO" | "DESCARTADO" | "INJETADO";
 }
 
+export interface ProcessingIssue {
+  fileName: string;
+  code:
+    | "FILE_READ_ERROR"
+    | "EMPTY_WORKBOOK"
+    | "CSV_PARSE_ERROR"
+    | "XLSX_PARSE_ERROR"
+    | "INVALID_DATE"
+    | "MAPPING_CONFLICT"
+    | "STATUS_SCAN_LIMIT"
+    | "HEADER_EXTRACTION_ERROR"
+    | "UNKNOWN_ERROR";
+  message: string;
+  row?: number;
+  column?: string;
+  rawValue?: unknown;
+}
+
 export interface ProcessingResult {
   data: Record<string, unknown>[];
   logs: MappingLog[];
+  errors: ProcessingIssue[];
+  warnings: ProcessingIssue[];
 }
 
 export interface FileHeaderMetadata {
@@ -22,15 +42,15 @@ export interface FileHeaderMetadata {
   samples: Record<string, string[]>;
 }
 
-export interface StatusDiscoveryWarning {
-  fileName: string;
-  code: "STATUS_SCAN_LIMIT";
-  message: string;
+export interface HeaderExtractionResult {
+  metadata: Record<string, FileHeaderMetadata>;
+  errors: ProcessingIssue[];
 }
 
 export interface StatusDiscoveryResult {
   statuses: string[];
-  warnings: StatusDiscoveryWarning[];
+  warnings: ProcessingIssue[];
+  errors: ProcessingIssue[];
 }
 
 type FileMappings = Record<string, Record<string, string>>;
@@ -44,6 +64,38 @@ interface ParsedFileData {
 
 const MAX_STATUS_ROWS = 5000;
 const MAX_UNIQUE_STATUSES = 500;
+
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function createIssue(
+  fileName: string,
+  code: ProcessingIssue["code"],
+  message: string,
+  details: Omit<ProcessingIssue, "fileName" | "code" | "message"> = {}
+): ProcessingIssue {
+  return {
+    fileName,
+    code,
+    message,
+    ...details,
+  };
+}
+
+function getParseIssueCode(file: File, error: unknown): ProcessingIssue["code"] {
+  if (isCsvFile(file)) {
+    return "CSV_PARSE_ERROR";
+  }
+
+  const message = getErrorMessage(error);
+
+  if (message.includes("não possui abas legíveis")) {
+    return "EMPTY_WORKBOOK";
+  }
+
+  return "XLSX_PARSE_ERROR";
+}
 
 function isCsvFile(file: File): boolean {
   return file.name.toLowerCase().endsWith(".csv");
@@ -175,6 +227,16 @@ function normalizeMappedValue(
   return normalizedValue;
 }
 
+interface ResolvedCandidate {
+  source: string;
+  rawValue: unknown;
+  normalizedValue: unknown;
+}
+
+function valuesAreDifferent(left: unknown, right: unknown): boolean {
+  return String(left).trim() !== String(right).trim();
+}
+
 export async function processFiles(
   files: File[],
   mappings: FileMappings,
@@ -185,9 +247,11 @@ export async function processFiles(
 ): Promise<ProcessingResult> {
   const combinedData: Record<string, unknown>[] = [];
   const logs: MappingLog[] = [];
+  const errors: ProcessingIssue[] = [];
+  const warnings: ProcessingIssue[] = [];
 
   if (!type) {
-    return { data: combinedData, logs };
+    return { data: combinedData, logs, errors, warnings };
   }
 
   for (let index = 0; index < files.length; index += 1) {
@@ -205,7 +269,11 @@ export async function processFiles(
     try {
       parsedFile = await parseTabularFile(file);
     } catch (error) {
-      console.error(`Error reading ${file.name}:`, error);
+      const message = getErrorMessage(error);
+
+      errors.push(
+        createIssue(file.name, getParseIssueCode(file, error), message)
+      );
       continue;
     }
 
@@ -252,25 +320,75 @@ export async function processFiles(
       ])
     );
 
-    const processedRows = parsedFile.rows.map((row) => {
+    const processedRows = parsedFile.rows.map((row, rowIndex) => {
       const newRow: ParsedRow = {};
+      const spreadsheetRow = rowIndex + 2;
 
       allTargets.forEach((target) => {
         const sources = targetToSources[target] || [];
-        let value: unknown = null;
+        const candidates: ResolvedCandidate[] = [];
 
         for (const source of sources) {
-          if (isMeaningfulValue(row[source])) {
-            value = row[source];
-            break;
+          const rawValue = row[source];
+
+          if (!isMeaningfulValue(rawValue)) {
+            continue;
+          }
+
+          const normalizedValue = normalizeMappedValue(target, rawValue, statusMappings);
+
+          if (isDateTarget(target) && !isMeaningfulValue(normalizedValue)) {
+            warnings.push(
+              createIssue(
+                file.name,
+                "INVALID_DATE",
+                `Valor de data inválido em ${source}. O campo ${target} foi mantido vazio.`,
+                {
+                  row: spreadsheetRow,
+                  column: source,
+                  rawValue,
+                }
+              )
+            );
+          }
+
+          if (isMeaningfulValue(normalizedValue)) {
+            candidates.push({
+              source,
+              rawValue,
+              normalizedValue,
+            });
           }
         }
 
-        if (value !== null) {
-          value = normalizeMappedValue(target, value, statusMappings);
+        if (candidates.length === 0) {
+          newRow[target] = null;
+          return;
         }
 
-        newRow[target] = value;
+        const [selectedCandidate, ...remainingCandidates] = candidates;
+        newRow[target] = selectedCandidate.normalizedValue;
+
+        const conflictingCandidates = remainingCandidates.filter((candidate) =>
+          valuesAreDifferent(candidate.normalizedValue, selectedCandidate.normalizedValue)
+        );
+
+        if (conflictingCandidates.length > 0) {
+          warnings.push(
+            createIssue(
+              file.name,
+              "MAPPING_CONFLICT",
+              `Múltiplas origens preenchidas para ${target}. Foi usado o primeiro valor não vazio após a normalização.`,
+              {
+                row: spreadsheetRow,
+                column: target,
+                rawValue: [selectedCandidate, ...conflictingCandidates]
+                  .map((candidate) => `${candidate.source}=${String(candidate.rawValue)}`)
+                  .join(" | "),
+              }
+            )
+          );
+        }
       });
 
       Object.entries(fileFixedValues).forEach(([target, value]) => {
@@ -287,7 +405,7 @@ export async function processFiles(
     combinedData.push(...processedRows);
   }
 
-  return { data: combinedData, logs };
+  return { data: combinedData, logs, errors, warnings };
 }
 
 export async function discoverUniqueStatuses(
@@ -296,12 +414,13 @@ export async function discoverUniqueStatuses(
   type: string
 ): Promise<StatusDiscoveryResult> {
   const uniqueStatuses = new Set<string>();
-  const warnings: StatusDiscoveryWarning[] = [];
+  const warnings: ProcessingIssue[] = [];
+  const errors: ProcessingIssue[] = [];
   let scannedRows = 0;
   let scanLimitReached = false;
 
   if (type !== "transactions") {
-    return { statuses: [], warnings: [] };
+    return { statuses: [], warnings: [], errors: [] };
   }
 
   for (const file of files) {
@@ -327,11 +446,13 @@ export async function discoverUniqueStatuses(
 
         if (scannedRows > MAX_STATUS_ROWS) {
           scanLimitReached = true;
-          warnings.push({
-            fileName: file.name,
-            code: "STATUS_SCAN_LIMIT",
-            message: `A coleta de status foi interrompida após ${MAX_STATUS_ROWS} linhas analisadas.`,
-          });
+          warnings.push(
+            createIssue(
+              file.name,
+              "STATUS_SCAN_LIMIT",
+              `A coleta de status foi interrompida após ${MAX_STATUS_ROWS} linhas analisadas.`
+            )
+          );
           break;
         }
 
@@ -343,11 +464,13 @@ export async function discoverUniqueStatuses(
 
             if (uniqueStatuses.size >= MAX_UNIQUE_STATUSES) {
               scanLimitReached = true;
-              warnings.push({
-                fileName: file.name,
-                code: "STATUS_SCAN_LIMIT",
-                message: `A coleta de status foi interrompida após ${MAX_UNIQUE_STATUSES} valores únicos.`,
-              });
+              warnings.push(
+                createIssue(
+                  file.name,
+                  "STATUS_SCAN_LIMIT",
+                  `A coleta de status foi interrompida após ${MAX_UNIQUE_STATUSES} valores únicos.`
+                )
+              );
               break;
             }
           }
@@ -358,18 +481,26 @@ export async function discoverUniqueStatuses(
         }
       }
     } catch (error) {
-      console.error(`Error scanning statuses in ${file.name}:`, error);
+      errors.push(
+        createIssue(
+          file.name,
+          getParseIssueCode(file, error),
+          `Falha ao analisar os status do arquivo. ${getErrorMessage(error)}`
+        )
+      );
     }
   }
 
   return {
     statuses: Array.from(uniqueStatuses).sort(),
     warnings,
+    errors,
   };
 }
 
-export async function extractFileHeaders(files: File[]): Promise<Record<string, FileHeaderMetadata>> {
-  const result: Record<string, FileHeaderMetadata> = {};
+export async function extractFileHeaders(files: File[]): Promise<HeaderExtractionResult> {
+  const metadata: Record<string, FileHeaderMetadata> = {};
+  const errors: ProcessingIssue[] = [];
 
   for (const file of files) {
     const fileKey = getFileKey(file);
@@ -390,17 +521,25 @@ export async function extractFileHeaders(files: File[]): Promise<Record<string, 
         });
       });
 
-      result[fileKey] = {
+      metadata[fileKey] = {
         headers: parsedFile.headers,
         samples: Object.fromEntries(
           Object.entries(columnSamples).map(([header, samples]) => [header, Array.from(samples)])
         ),
       };
     } catch (error) {
-      console.error(`Error extracting headers from ${file.name}:`, error);
-      result[fileKey] = { headers: [], samples: {} };
+      metadata[fileKey] = { headers: [], samples: {} };
+      errors.push(
+        createIssue(
+          file.name,
+          getParseIssueCode(file, error) === "EMPTY_WORKBOOK"
+            ? "EMPTY_WORKBOOK"
+            : "HEADER_EXTRACTION_ERROR",
+          `Falha ao extrair cabeçalhos do arquivo. ${getErrorMessage(error)}`
+        )
+      );
     }
   }
 
-  return result;
+  return { metadata, errors };
 }
