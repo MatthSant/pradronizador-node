@@ -320,7 +320,7 @@ export async function processFiles(
       ])
     );
 
-    const processedRows = parsedFile.rows.map((row, rowIndex) => {
+    for (const [rowIndex, row] of parsedFile.rows.entries()) {
       const newRow: ParsedRow = {};
       const spreadsheetRow = rowIndex + 2;
 
@@ -405,10 +405,8 @@ export async function processFiles(
 
       newRow.idform = file.name;
 
-      return newRow;
-    });
-
-    combinedData.push(...processedRows);
+      combinedData.push(newRow);
+    }
   }
 
   return { data: combinedData, logs, errors, warnings };

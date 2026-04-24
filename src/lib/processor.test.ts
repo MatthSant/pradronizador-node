@@ -317,6 +317,48 @@ describe("processFiles", () => {
     expect(result.errors).toEqual([]);
     expect(result.warnings).toEqual([]);
   });
+
+  it("processes large batches without overflowing the call stack", async () => {
+    const file = createCsvFile("Nome\nAna", "lote-grande.csv");
+    const fileKey = getFileKey(file);
+    const parseSpy = vi.spyOn(Papa, "parse").mockImplementation((_, config) => {
+      const data = [["Nome"]];
+
+      for (let index = 0; index < 70000; index += 1) {
+        data.push([`Pessoa ${index}`]);
+      }
+
+      config?.complete?.({ data } as never);
+      return {} as Papa.Parser;
+    });
+
+    try {
+      const result = await processFiles(
+        [file],
+        {
+          [fileKey]: {
+            Nome: "field_name",
+          },
+        },
+        { [fileKey]: {} },
+        "events"
+      );
+
+      expect(result.data).toHaveLength(70000);
+      expect(result.data[0]).toEqual({
+        field_name: "Pessoa 0",
+        idform: "lote-grande.csv",
+      });
+      expect(result.data[69999]).toEqual({
+        field_name: "Pessoa 69999",
+        idform: "lote-grande.csv",
+      });
+      expect(result.errors).toEqual([]);
+      expect(result.warnings).toEqual([]);
+    } finally {
+      parseSpy.mockRestore();
+    }
+  });
 });
 
 describe("discoverUniqueStatuses", () => {
