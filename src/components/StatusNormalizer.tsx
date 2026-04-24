@@ -2,10 +2,12 @@
 
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle2, AlertCircle, XCircle, RotateCcw, ArrowRight, ShieldCheck, CreditCard, Ban, Undo2 } from 'lucide-react';
+import type { StatusDiscoveryWarning } from '@/lib/processor';
+import { CheckCircle2, AlertCircle, ShieldCheck, CreditCard, Ban, Undo2 } from 'lucide-react';
 
 interface StatusNormalizerProps {
   discoveredStatuses: string[];
+  warnings: StatusDiscoveryWarning[];
   mappings: Record<string, string>;
   onChange: (mappings: Record<string, string>) => void;
 }
@@ -19,6 +21,7 @@ const TARGET_STATUSES = [
 
 export const StatusNormalizer: React.FC<StatusNormalizerProps> = ({ 
   discoveredStatuses, 
+  warnings,
   mappings, 
   onChange 
 }) => {
@@ -51,6 +54,22 @@ export const StatusNormalizer: React.FC<StatusNormalizerProps> = ({
           </div>
         </div>
       </div>
+
+      {warnings.length > 0 && (
+        <div className="p-8 bg-amber-50/50 border border-amber-100 rounded-[2rem]">
+          <div className="flex items-center space-x-3 text-amber-700 mb-4">
+            <AlertCircle className="w-5 h-5" />
+            <h4 className="text-technical">Coleta de Status com Limites</h4>
+          </div>
+          <div className="space-y-2">
+            {warnings.map((warning) => (
+              <p key={`${warning.fileName}-${warning.code}`} className="text-sm text-amber-900 font-medium leading-relaxed">
+                {warning.fileName}: {warning.message}
+              </p>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-6">
         <AnimatePresence mode="popLayout">

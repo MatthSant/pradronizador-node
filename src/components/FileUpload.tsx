@@ -1,9 +1,14 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useDropzone } from 'react-dropzone';
+import { type FileRejection, useDropzone } from 'react-dropzone';
 import { Upload, X, FileText, CheckCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+
+const MAX_FILE_SIZE = 50 * 1024 * 1024;
+const MAX_FILES = 10;
+const REJECTION_MESSAGE =
+  'Arquivo recusado. Verifique o limite de 50MB, máximo de 10 arquivos no lote e os formatos permitidos CSV/XLSX/XLS.';
 
 interface FileUploadProps {
   onFilesSelected: (files: File[]) => void;
@@ -11,6 +16,13 @@ interface FileUploadProps {
 
 export const FileUpload: React.FC<FileUploadProps> = ({ onFilesSelected }) => {
   const [files, setFiles] = useState<File[]>([]);
+  const [rejectionMessage, setRejectionMessage] = useState('');
+
+  const handleDropRejected = (fileRejections: FileRejection[]) => {
+    if (fileRejections.length > 0) {
+      setRejectionMessage(REJECTION_MESSAGE);
+    }
+  };
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     accept: {
@@ -18,11 +30,20 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFilesSelected }) => {
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
       'application/vnd.ms-excel': ['.xls']
     },
+    maxSize: MAX_FILE_SIZE,
+    maxFiles: MAX_FILES,
     onDrop: (acceptedFiles) => {
+      if (files.length + acceptedFiles.length > MAX_FILES) {
+        setRejectionMessage(REJECTION_MESSAGE);
+        return;
+      }
+
+      setRejectionMessage('');
       const newFiles = [...files, ...acceptedFiles];
       setFiles(newFiles);
       onFilesSelected(newFiles);
-    }
+    },
+    onDropRejected: handleDropRejected
   });
 
   const removeFile = (index: number) => {
@@ -57,11 +78,21 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFilesSelected }) => {
               {isDragActive ? 'Solte para Ingerir' : 'Ingestão de Artefatos'}
             </h3>
             <p className="text-technical text-slate-500 mt-2">
-              Formatos aceitos: CSV, XLSX de até 50MB
+              Formatos aceitos: CSV, XLSX, XLS. Até 50MB e no máximo 10 arquivos.
             </p>
           </div>
         </div>
       </div>
+
+      {rejectionMessage && (
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="rounded-[2rem] border border-rose-100 bg-rose-50/40 px-6 py-5 text-sm font-medium text-rose-700"
+        >
+          {rejectionMessage}
+        </motion.div>
+      )}
 
       <AnimatePresence>
         {files.length > 0 && (
