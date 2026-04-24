@@ -5,10 +5,12 @@ import { type FileRejection, useDropzone } from 'react-dropzone';
 import { Upload, X, FileText, CheckCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const MAX_FILE_SIZE = 50 * 1024 * 1024;
+// Temporary uplift for e2e testing.
+const MAX_FILE_SIZE_MB = 250;
+const MAX_FILE_SIZE = MAX_FILE_SIZE_MB * 1024 * 1024;
 const MAX_FILES = 10;
 const REJECTION_MESSAGE =
-  'Arquivo recusado. Verifique o limite de 50MB, máximo de 10 arquivos no lote e os formatos permitidos CSV/XLSX/XLS.';
+  `Arquivo recusado. Verifique o limite de ${MAX_FILE_SIZE_MB}MB, máximo de 10 arquivos no lote e os formatos permitidos CSV/XLSX/XLS.`;
 
 interface FileUploadProps {
   onFilesSelected: (files: File[]) => void;
@@ -78,7 +80,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFilesSelected }) => {
               {isDragActive ? 'Solte para Ingerir' : 'Ingestão de Artefatos'}
             </h3>
             <p className="text-technical text-slate-500 mt-2">
-              Formatos aceitos: CSV, XLSX, XLS. Até 50MB e no máximo 10 arquivos.
+              Formatos aceitos: CSV, XLSX, XLS. Até {MAX_FILE_SIZE_MB}MB e no máximo 10 arquivos.
             </p>
           </div>
         </div>
