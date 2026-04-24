@@ -21,6 +21,17 @@ export interface FileHeaderMetadata {
   samples: Record<string, string[]>;
 }
 
+export interface StatusDiscoveryWarning {
+  fileName: string;
+  code: "STATUS_SCAN_LIMIT";
+  message: string;
+}
+
+export interface StatusDiscoveryResult {
+  statuses: string[];
+  warnings: StatusDiscoveryWarning[];
+}
+
 type FileMappings = Record<string, Record<string, string>>;
 type FixedValues = Record<string, Record<string, string>>;
 type ParsedRow = Record<string, unknown>;
@@ -29,6 +40,9 @@ interface ParsedFileData {
   headers: string[];
   rows: ParsedRow[];
 }
+
+const MAX_STATUS_ROWS = 5000;
+const MAX_UNIQUE_STATUSES = 500;
 
 function isCsvFile(file: File): boolean {
   return file.name.toLowerCase().endsWith(".csv");
@@ -278,14 +292,21 @@ export async function discoverUniqueStatuses(
   files: File[],
   mappings: FileMappings,
   type: string
-): Promise<string[]> {
+): Promise<StatusDiscoveryResult> {
   const uniqueStatuses = new Set<string>();
+  const warnings: StatusDiscoveryWarning[] = [];
+  let scannedRows = 0;
+  let scanLimitReached = false;
 
   if (type !== "transactions") {
-    return [];
+    return { statuses: [], warnings: [] };
   }
 
   for (const file of files) {
+    if (scanLimitReached) {
+      break;
+    }
+
     const fileMappings = mappings[file.name] || {};
     const statusCols = Object.entries(fileMappings)
       .filter(([, target]) => isStatusTarget(target))
@@ -298,21 +319,50 @@ export async function discoverUniqueStatuses(
     try {
       const parsedFile = await parseTabularFile(file);
 
-      parsedFile.rows.forEach((row) => {
-        statusCols.forEach((column) => {
+      for (const row of parsedFile.rows) {
+        scannedRows += 1;
+
+        if (scannedRows > MAX_STATUS_ROWS) {
+          scanLimitReached = true;
+          warnings.push({
+            fileName: file.name,
+            code: "STATUS_SCAN_LIMIT",
+            message: `A coleta de status foi interrompida após ${MAX_STATUS_ROWS} linhas analisadas.`,
+          });
+          break;
+        }
+
+        for (const column of statusCols) {
           const value = row[column];
 
           if (isMeaningfulValue(value)) {
             uniqueStatuses.add(String(value).trim());
+
+            if (uniqueStatuses.size >= MAX_UNIQUE_STATUSES) {
+              scanLimitReached = true;
+              warnings.push({
+                fileName: file.name,
+                code: "STATUS_SCAN_LIMIT",
+                message: `A coleta de status foi interrompida após ${MAX_UNIQUE_STATUSES} valores únicos.`,
+              });
+              break;
+            }
           }
-        });
-      });
+        }
+
+        if (scanLimitReached) {
+          break;
+        }
+      }
     } catch (error) {
       console.error(`Error scanning statuses in ${file.name}:`, error);
     }
   }
 
-  return Array.from(uniqueStatuses).sort();
+  return {
+    statuses: Array.from(uniqueStatuses).sort(),
+    warnings,
+  };
 }
 
 export async function extractFileHeaders(files: File[]): Promise<Record<string, FileHeaderMetadata>> {

@@ -9,8 +9,9 @@ import { MappingReview } from '@/components/MappingReview';
 import { StatusNormalizer } from '@/components/StatusNormalizer';
 import { FixedValueInjector } from '@/components/FixedValueInjector';
 import { createCsvBlob } from '@/lib/csv';
-import { processFiles, extractFileHeaders, discoverUniqueStatuses } from '@/lib/processor';
-import { ArrowLeft, Play, Download, CheckCircle2, ChevronRight, ChevronLeft, Layers, Loader2, Sparkles } from 'lucide-react';
+import { FIELD_DESCRIPTIONS } from '@/lib/constants';
+import { processFiles, extractFileHeaders, discoverUniqueStatuses, type ProcessingResult, type StatusDiscoveryWarning } from '@/lib/processor';
+import { Play, Download, CheckCircle2, ChevronRight, ChevronLeft, Layers, Loader2, Sparkles } from 'lucide-react';
 import { usePipeline } from '@/providers/PipelineContext';
 
 export default function ProcessorPage() {
@@ -28,17 +29,20 @@ export default function ProcessorPage() {
   const [perFileData, setPerFileData] = useState<Record<string, { headers: string[], samples: Record<string, string[]> }>>({});
   const [activeMappingFileIdx, setActiveMappingFileIdx] = useState(0);
   const [discoveredStatuses, setDiscoveredStatuses] = useState<string[]>([]);
+  const [statusDiscoveryWarnings, setStatusDiscoveryWarnings] = useState<StatusDiscoveryWarning[]>([]);
   const [isDiscoveringStatuses, setIsDiscoveringStatuses] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingStatus, setProcessingStatus] = useState({ current: 0, total: 0, fileName: '' });
   const [isExtractingHeaders, setIsExtractingHeaders] = useState(false);
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<ProcessingResult | null>(null);
 
   const isSurvey = type === 'survey';
   const isTransaction = type === 'transactions';
 
   const handleFilesSelected = async (selectedFiles: File[]) => {
     setFiles(selectedFiles);
+    setStatusDiscoveryWarnings([]);
+    setDiscoveredStatuses([]);
     
     // Initialize empty records per file
     const initialMappings: Record<string, Record<string, string>> = {};
@@ -80,9 +84,11 @@ export default function ProcessorPage() {
 
   const handleStartStatusDiscovery = async () => {
     setIsDiscoveringStatuses(true);
+    setStatusDiscoveryWarnings([]);
     try {
-      const statuses = await discoverUniqueStatuses(files, mappings, type as string);
-      setDiscoveredStatuses(statuses);
+      const result = await discoverUniqueStatuses(files, mappings, type as string);
+      setDiscoveredStatuses(result.statuses);
+      setStatusDiscoveryWarnings(result.warnings);
       setStep(3);
     } catch (err) {
       console.error(err);
@@ -364,6 +370,7 @@ export default function ProcessorPage() {
                 </button>
                 
                 <button 
+                  disabled={isDiscoveringStatuses}
                   onClick={() => {
                     if (activeMappingFileIdx < files.length - 1) {
                       setActiveMappingFileIdx(prev => prev + 1);
@@ -378,7 +385,7 @@ export default function ProcessorPage() {
                   {activeMappingFileIdx < files.length - 1 ? (
                     <>Próximo Arquivo <ChevronRight className="ml-3 w-5 h-5" /></>
                   ) : isTransaction ? (
-                    <>Mapeamento de Status <ChevronRight className="ml-3 w-5 h-5" /></>
+                    <>{isDiscoveringStatuses ? 'Analisando Status...' : 'Mapeamento de Status'} <ChevronRight className="ml-3 w-5 h-5" /></>
                   ) : (
                     <>Auditoria Final <ChevronRight className="ml-3 w-5 h-5" /></>
                   )}
@@ -391,6 +398,7 @@ export default function ProcessorPage() {
             <div className="space-y-12">
               <StatusNormalizer 
                 discoveredStatuses={discoveredStatuses}
+                warnings={statusDiscoveryWarnings}
                 mappings={statusMappings}
                 onChange={setStatusMappings}
               />
@@ -428,7 +436,7 @@ export default function ProcessorPage() {
             <div className="space-y-12">
               <FixedValueInjector 
                 files={files}
-                unmappedTargets={Object.keys(require('@/lib/constants').FIELD_DESCRIPTIONS).filter(t => !Object.values(mappings).some(m => Object.values(m).includes(t)))}
+                unmappedTargets={Object.keys(FIELD_DESCRIPTIONS).filter(t => !Object.values(mappings).some(m => Object.values(m).includes(t)))}
                 onChange={setFixedValues} 
                 initialValues={fixedValues}
               />
@@ -503,7 +511,7 @@ export default function ProcessorPage() {
                   </div>
                   <button 
                     onClick={() => {
-                      const logData = result.logs.map((l: any) => ({
+                      const logData = result.logs.map((l) => ({
                         "Arquivo": l.arquivo,
                         "Coluna Origem": l.origem,
                         "Destino Final": l.destino,

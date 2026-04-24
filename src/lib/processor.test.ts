@@ -1,7 +1,8 @@
 import { File as NodeFile } from "node:buffer";
 
 import * as XLSX from "xlsx";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import Papa from "papaparse";
 
 import { discoverUniqueStatuses, extractFileHeaders, processFiles } from "./processor";
 
@@ -121,7 +122,7 @@ describe("discoverUniqueStatuses", () => {
       "status.csv"
     );
 
-    const statuses = await discoverUniqueStatuses(
+    const result = await discoverUniqueStatuses(
       [file],
       {
         "status.csv": {
@@ -131,6 +132,48 @@ describe("discoverUniqueStatuses", () => {
       "transactions"
     );
 
-    expect(statuses).toEqual(["aprovado", "reembolsado"]);
+    expect(result.statuses).toEqual(["aprovado", "reembolsado"]);
+    expect(result.warnings).toEqual([]);
+  });
+
+  it("stops scanning and returns a warning after the configured row limit", async () => {
+    const rows = Array.from({ length: 5001 }, (_, index) => `pendente_${index % 2}`);
+    const file = createCsvFile(
+      `Status\n${rows.join("\n")}`,
+      "status-limit.csv"
+    );
+
+    const result = await discoverUniqueStatuses(
+      [file],
+      {
+        "status-limit.csv": {
+          Status: "field_transaction_status",
+        },
+      },
+      "transactions"
+    );
+
+    expect(result.statuses).toEqual(["pendente_0", "pendente_1"]);
+    expect(result.warnings).toEqual([
+      {
+        fileName: "status-limit.csv",
+        code: "STATUS_SCAN_LIMIT",
+        message: "A coleta de status foi interrompida após 5000 linhas analisadas.",
+      },
+    ]);
+  });
+});
+
+describe("parser hardening", () => {
+  it("does not hang when PapaParse reports an error during header extraction", async () => {
+    const parseSpy = vi.spyOn(Papa, "parse").mockImplementation((_, config) => {
+      config?.error?.(new Error("csv parse failed"), "" as never, null);
+      return {} as Papa.Parser;
+    });
+
+    const metadata = await extractFileHeaders([createCsvFile("qualquer", "erro.csv")]);
+
+    expect(metadata["erro.csv"]).toEqual({ headers: [], samples: {} });
+    parseSpy.mockRestore();
   });
 });
