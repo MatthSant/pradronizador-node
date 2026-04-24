@@ -169,7 +169,7 @@ async function parseCsvMatrix(file: File, previewRows?: number): Promise<unknown
       complete: (results) => {
         resolve(normalizeMatrixRows(results.data));
       },
-      error: (err) => {
+      error: (err: Error) => {
         reject(err);
       },
     });
