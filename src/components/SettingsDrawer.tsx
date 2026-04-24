@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Settings, RotateCcw, Trash2, Edit3, Check, Sparkles, AlertTriangle, ChevronRight, ShieldCheck } from 'lucide-react';
+import { X, Settings, RotateCcw, Trash2, Edit3, Sparkles, AlertTriangle, ShieldCheck } from 'lucide-react';
 import { usePipeline } from '@/providers/PipelineContext';
 
 interface SettingsDrawerProps {
