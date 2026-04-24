@@ -16,7 +16,7 @@ interface PipelineContextType {
   fixedValues: Record<string, Record<string, string>>;
   
   setFiles: (files: File[]) => void;
-  updateMapping: (fileName: string, fileMappings: Record<string, string>) => void;
+  updateMapping: (fileKey: string, fileMappings: Record<string, string>) => void;
   setMappings: (mappings: Record<string, Record<string, string>>) => void;
   addCustomField: (label: string) => string;
   updateCustomField: (key: string, newLabel: string) => void;
@@ -37,10 +37,10 @@ export const PipelineProvider = ({ children }: { children: ReactNode }) => {
   const [statusMappings, setStatusMappings] = useState<Record<string, string>>({});
   const [fixedValues, setFixedValues] = useState<Record<string, Record<string, string>>>({});
 
-  const updateMapping = useCallback((fileName: string, fileMappings: Record<string, string>) => {
+  const updateMapping = useCallback((fileKey: string, fileMappings: Record<string, string>) => {
     setMappings(prev => ({
       ...prev,
-      [fileName]: fileMappings
+      [fileKey]: fileMappings
     }));
   }, []);
 

@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { FIELD_DESCRIPTIONS } from '@/lib/constants';
+import { getFileKey } from '@/lib/files';
 import { X, Tag, Sparkles, FileStack, ChevronRight, Plus } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -20,12 +21,15 @@ export const FixedValueInjector: React.FC<FixedValueInjectorProps> = ({
 }) => {
   const [activeFileIdx, setActiveFileIdx] = useState(0);
   const activeFile = files[activeFileIdx];
-  const activeValues = initialValues[activeFile?.name] || {};
+  const activeFileKey = activeFile ? getFileKey(activeFile) : null;
+  const activeValues = activeFileKey ? initialValues[activeFileKey] || {} : {};
 
   const updateFileValues = (newValues: Record<string, string>) => {
+    if (!activeFileKey) return;
+
     const next = {
       ...initialValues,
-      [activeFile.name]: newValues
+      [activeFileKey]: newValues
     };
     onChange(next);
   };
@@ -57,12 +61,13 @@ export const FixedValueInjector: React.FC<FixedValueInjectorProps> = ({
         
         <div className="space-y-3 max-h-[600px] overflow-y-auto custom-scrollbar pr-2">
           {files.map((file, idx) => {
-            const tagCount = Object.keys(initialValues[file.name] || {}).length;
+            const fileKey = getFileKey(file);
+            const tagCount = Object.keys(initialValues[fileKey] || {}).length;
             const isActive = activeFileIdx === idx;
             
             return (
               <button
-                key={file.name}
+                key={fileKey}
                 onClick={() => setActiveFileIdx(idx)}
                 className={`w-full text-left p-6 rounded-[2rem] border transition-all duration-500 group relative overflow-hidden ${
                   isActive 
@@ -146,9 +151,9 @@ export const FixedValueInjector: React.FC<FixedValueInjectorProps> = ({
                 </motion.div>
               )}
 
-              {Object.entries(activeValues).map(([target, val], idx) => (
+              {Object.entries(activeValues).map(([target, val]) => (
                 <motion.div 
-                  key={`${activeFile.name}-${target}`}
+                  key={`${activeFileKey}-${target}`}
                   layout
                   initial={{ opacity: 0, scale: 0.98, y: 10 }}
                   animate={{ opacity: 1, scale: 1, y: 0 }}

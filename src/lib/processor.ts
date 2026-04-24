@@ -1,6 +1,7 @@
 import * as XLSX from "xlsx";
 import Papa from "papaparse";
 
+import { getFileKey } from "./files";
 import { makeUniqueHeaders } from "./headers";
 import { cleanEmail, mapStatus, cleanSurrogates, normalizeDate } from "./normalization";
 
@@ -191,14 +192,15 @@ export async function processFiles(
 
   for (let index = 0; index < files.length; index += 1) {
     const file = files[index];
+    const fileKey = getFileKey(file);
 
     if (onProgress) {
       await onProgress(file.name, index + 1, files.length);
     }
 
     let parsedFile: ParsedFileData = { headers: [], rows: [] };
-    const fileMappings = mappings[file.name] || {};
-    const fileFixedValues = fixedValues[file.name] || {};
+    const fileMappings = mappings[fileKey] || {};
+    const fileFixedValues = fixedValues[fileKey] || {};
 
     try {
       parsedFile = await parseTabularFile(file);
@@ -307,7 +309,8 @@ export async function discoverUniqueStatuses(
       break;
     }
 
-    const fileMappings = mappings[file.name] || {};
+    const fileKey = getFileKey(file);
+    const fileMappings = mappings[fileKey] || {};
     const statusCols = Object.entries(fileMappings)
       .filter(([, target]) => isStatusTarget(target))
       .map(([source]) => source);
@@ -369,6 +372,8 @@ export async function extractFileHeaders(files: File[]): Promise<Record<string, 
   const result: Record<string, FileHeaderMetadata> = {};
 
   for (const file of files) {
+    const fileKey = getFileKey(file);
+
     try {
       const parsedFile = await parseTabularFile(file, 50);
       const columnSamples: Record<string, Set<string>> = {};
@@ -385,7 +390,7 @@ export async function extractFileHeaders(files: File[]): Promise<Record<string, 
         });
       });
 
-      result[file.name] = {
+      result[fileKey] = {
         headers: parsedFile.headers,
         samples: Object.fromEntries(
           Object.entries(columnSamples).map(([header, samples]) => [header, Array.from(samples)])
@@ -393,7 +398,7 @@ export async function extractFileHeaders(files: File[]): Promise<Record<string, 
       };
     } catch (error) {
       console.error(`Error extracting headers from ${file.name}:`, error);
-      result[file.name] = { headers: [], samples: {} };
+      result[fileKey] = { headers: [], samples: {} };
     }
   }
 

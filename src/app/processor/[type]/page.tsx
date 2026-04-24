@@ -10,7 +10,8 @@ import { StatusNormalizer } from '@/components/StatusNormalizer';
 import { FixedValueInjector } from '@/components/FixedValueInjector';
 import { createCsvBlob } from '@/lib/csv';
 import { FIELD_DESCRIPTIONS } from '@/lib/constants';
-import { processFiles, extractFileHeaders, discoverUniqueStatuses, type ProcessingResult, type StatusDiscoveryWarning } from '@/lib/processor';
+import { getFileKey } from '@/lib/files';
+import { processFiles, extractFileHeaders, discoverUniqueStatuses, type FileHeaderMetadata, type ProcessingResult, type StatusDiscoveryWarning } from '@/lib/processor';
 import { Play, Download, CheckCircle2, ChevronRight, ChevronLeft, Layers, Loader2, Sparkles } from 'lucide-react';
 import { usePipeline } from '@/providers/PipelineContext';
 
@@ -26,7 +27,7 @@ export default function ProcessorPage() {
   } = usePipeline();
   
   const [step, setStep] = useState<number>(1);
-  const [perFileData, setPerFileData] = useState<Record<string, { headers: string[], samples: Record<string, string[]> }>>({});
+  const [perFileData, setPerFileData] = useState<Record<string, FileHeaderMetadata>>({});
   const [activeMappingFileIdx, setActiveMappingFileIdx] = useState(0);
   const [discoveredStatuses, setDiscoveredStatuses] = useState<string[]>([]);
   const [statusDiscoveryWarnings, setStatusDiscoveryWarnings] = useState<StatusDiscoveryWarning[]>([]);
@@ -38,6 +39,8 @@ export default function ProcessorPage() {
 
   const isSurvey = type === 'survey';
   const isTransaction = type === 'transactions';
+  const activeMappingFile = files[activeMappingFileIdx];
+  const activeMappingFileKey = activeMappingFile ? getFileKey(activeMappingFile) : null;
 
   const handleFilesSelected = async (selectedFiles: File[]) => {
     setFiles(selectedFiles);
@@ -48,8 +51,9 @@ export default function ProcessorPage() {
     const initialMappings: Record<string, Record<string, string>> = {};
     const initialFixed: Record<string, Record<string, string>> = {};
     selectedFiles.forEach(f => {
-      initialMappings[f.name] = {};
-      initialFixed[f.name] = {};
+      const fileKey = getFileKey(f);
+      initialMappings[fileKey] = {};
+      initialFixed[fileKey] = {};
     });
     setMappings(initialMappings);
     setFixedValues(initialFixed);
@@ -71,7 +75,7 @@ export default function ProcessorPage() {
   const updateMappingForActiveFile = useCallback((newFileMappings: Record<string, string>) => {
     const currentFile = files[activeMappingFileIdx];
     if (!currentFile) return;
-    updateMapping(currentFile.name, newFileMappings);
+    updateMapping(getFileKey(currentFile), newFileMappings);
   }, [files, activeMappingFileIdx, updateMapping]);
 
   const customFieldLabels = useMemo(() => {
@@ -343,16 +347,16 @@ export default function ProcessorPage() {
 
           {step === 2 && (
             <div className="space-y-12">
-              {files[activeMappingFileIdx] && (
+              {activeMappingFile && activeMappingFileKey && (
                 <MappingInterface 
-                  activeFileName={files[activeMappingFileIdx].name}
+                  activeFileName={activeMappingFile.name}
                   fileIndex={activeMappingFileIdx}
                   totalFiles={files.length}
-                  sourceColumns={perFileData[files[activeMappingFileIdx].name]?.headers || []} 
-                  sourceSamples={perFileData[files[activeMappingFileIdx].name]?.samples || {}}
+                  sourceColumns={perFileData[activeMappingFileKey]?.headers || []} 
+                  sourceSamples={perFileData[activeMappingFileKey]?.samples || {}}
                   type={type as string}
                   customFieldLabels={customFieldLabels}
-                  initialMappings={mappings[files[activeMappingFileIdx].name] || {}}
+                  initialMappings={mappings[activeMappingFileKey] || {}}
                   onMappingChange={updateMappingForActiveFile} 
                   onAddCustomField={isSurvey ? addCustomField : undefined}
                 />
@@ -416,10 +420,10 @@ export default function ProcessorPage() {
           {step === 4 && (
             <div className="space-y-12">
               <MappingReview 
+                files={files}
                 mappings={mappings}
                 perFileData={perFileData}
                 type={type as string}
-                customFieldLabels={customFieldLabels}
               />
               <div className="flex flex-col md:flex-row justify-between items-center gap-8 border-t border-slate-50 pt-10">
                 <button onClick={() => setStep(isTransaction ? 3 : 2)} className="px-10 py-5 rounded-2xl text-technical text-slate-400 hover:text-slate-900 transition-colors flex items-center group">

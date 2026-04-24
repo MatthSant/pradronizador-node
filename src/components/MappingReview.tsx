@@ -2,35 +2,43 @@
 
 import React, { useMemo } from 'react';
 import { FIELD_DESCRIPTIONS } from '@/lib/constants';
-import { CheckCircle2, AlertTriangle, Trash2, ArrowRightLeft, Sparkles, ClipboardCheck } from 'lucide-react';
+import { getFileKey } from '@/lib/files';
+import { CheckCircle2, AlertTriangle, Sparkles, ClipboardCheck } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 interface MappingReviewProps {
+  files: File[];
   mappings: Record<string, Record<string, string>>;
   perFileData: Record<string, { headers: string[], samples: Record<string, string[]> }>;
   type: string;
-  customFieldLabels: Record<string, string>;
 }
 
-export const MappingReview: React.FC<MappingReviewProps> = ({ mappings, perFileData, type, customFieldLabels }) => {
+export const MappingReview: React.FC<MappingReviewProps> = ({ files, mappings, perFileData, type }) => {
   const summary = useMemo(() => {
     let totalMappedCount = 0;
     let totalUnusedCount = 0;
     const fileSummaries: { name: string, mapped: number, total: number }[] = [];
     const allMappedTargets = new Set<string>();
 
-    Object.entries(perFileData).forEach(([fileName, data]) => {
-      const fileMappings = mappings[fileName] || {};
-      const mappedInFile = Object.entries(fileMappings).filter(([_, t]) => t !== '__NONE__' && t !== '__SKIP__');
+    files.forEach((file) => {
+      const fileKey = getFileKey(file);
+      const data = perFileData[fileKey];
+
+      if (!data) {
+        return;
+      }
+
+      const fileMappings = mappings[fileKey] || {};
+      const mappedInFile = Object.entries(fileMappings).filter(([, target]) => target !== '__NONE__' && target !== '__SKIP__');
       const unusedInFile = data.headers.filter(h => !fileMappings[h] || fileMappings[h] === '__NONE__' || fileMappings[h] === '__SKIP__');
       
       totalMappedCount += mappedInFile.length;
       totalUnusedCount += unusedInFile.length;
       
-      mappedInFile.forEach(([_, t]) => allMappedTargets.add(t));
+      mappedInFile.forEach(([, target]) => allMappedTargets.add(target));
       
       fileSummaries.push({
-        name: fileName,
+        name: file.name,
         mapped: mappedInFile.length,
         total: data.headers.length
       });
@@ -46,10 +54,10 @@ export const MappingReview: React.FC<MappingReviewProps> = ({ mappings, perFileD
         if (!isGlobal && !isTypeSpecific) return false;
         return !allMappedTargets.has(key);
       })
-      .map(([_, meta]) => meta.name);
+      .map(([, meta]) => meta.name);
 
     return { totalMappedCount, totalUnusedCount, fileSummaries, missingRequired };
-  }, [mappings, perFileData, type]);
+  }, [files, mappings, perFileData, type]);
 
   return (
     <div className="space-y-12 animate-in fade-in duration-1000">
@@ -84,8 +92,8 @@ export const MappingReview: React.FC<MappingReviewProps> = ({ mappings, perFileD
             Você pode mapeá-los agora ou injetar valores padrão (Tags Fixas) no próximo passo.
           </p>
           <div className="flex flex-wrap gap-3 pt-2">
-            {summary.missingRequired.map((name, i) => (
-              <span key={i} className="px-5 py-2 bg-white border border-rose-100 text-rose-600 text-[10px] font-black uppercase tracking-widest rounded-xl shadow-sm">
+            {summary.missingRequired.map((name, index) => (
+              <span key={index} className="px-5 py-2 bg-white border border-rose-100 text-rose-600 text-[10px] font-black uppercase tracking-widest rounded-xl shadow-sm">
                 {name}
               </span>
             ))}
