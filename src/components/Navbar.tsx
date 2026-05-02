@@ -11,9 +11,10 @@ export const Navbar = () => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   const navLinks = [
-    { name: 'Eventos', href: '/processor/events' },
-    { name: 'Pesquisa', href: '/processor/survey' },
-    { name: 'Transações', href: '/processor/transactions' }
+    { name: 'Eventos',     href: '/processor/events' },
+    { name: 'Pesquisa',    href: '/processor/survey' },
+    { name: 'Transações',  href: '/processor/transactions' },
+    { name: 'Verificador', href: '/verificador', accent: true },
   ];
 
   return (
@@ -32,17 +33,20 @@ export const Navbar = () => {
         <div className="hidden md:flex items-center space-x-8">
           {navLinks.map((link) => {
             const isActive = pathname === link.href;
+            const amber = link.accent;
             return (
-              <Link 
+              <Link
                 key={link.href}
-                href={link.href} 
+                href={link.href}
                 className={`relative py-1 text-[10px] font-bold uppercase tracking-widest transition-all ${
-                  isActive ? 'text-purple-700' : 'text-slate-500 hover:text-slate-900'
+                  isActive
+                    ? amber ? 'text-amber-600' : 'text-purple-700'
+                    : amber ? 'text-amber-500 hover:text-amber-700' : 'text-slate-500 hover:text-slate-900'
                 }`}
               >
                 {link.name}
                 {isActive && (
-                  <div className="absolute -bottom-1 left-1.5 right-1.5 h-0.5 bg-purple-600 rounded-full" />
+                  <div className={`absolute -bottom-1 left-1.5 right-1.5 h-0.5 rounded-full ${amber ? 'bg-amber-500' : 'bg-purple-600'}`} />
                 )}
               </Link>
             );
