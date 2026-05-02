@@ -40,3 +40,4 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 PRODUCTION_HARDENING_PLAN.md
+/.claude

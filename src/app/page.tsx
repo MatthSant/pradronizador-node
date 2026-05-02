@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { MousePointer2, ClipboardList, TrendingUp, ArrowRight, Sparkles, ShieldCheck } from 'lucide-react';
+import { MousePointer2, ClipboardList, TrendingUp, ArrowRight, Sparkles, ShieldCheck, ScanSearch } from 'lucide-react';
 
 const options = [
   {
@@ -12,7 +12,8 @@ const options = [
     icon: MousePointer2,
     accent: "text-blue-600",
     href: "/processor/events",
-    delay: 0.1
+    delay: 0.1,
+    badge: null,
   },
   {
     title: "wtl_survey",
@@ -20,7 +21,8 @@ const options = [
     icon: ClipboardList,
     accent: "text-purple-600",
     href: "/processor/survey",
-    delay: 0.2
+    delay: 0.2,
+    badge: null,
   },
   {
     title: "wtl_transactions",
@@ -28,9 +30,20 @@ const options = [
     icon: TrendingUp,
     accent: "text-emerald-600",
     href: "/processor/transactions",
-    delay: 0.3
+    delay: 0.3,
+    badge: null,
   }
 ];
+
+const qualityOption = {
+  title: "Verificador de Qualidade",
+  desc: "Detecte e corrija problemas antes de processar: datas inconsistentes, emails inválidos, valores fora do padrão e mais.",
+  icon: ScanSearch,
+  accent: "text-amber-600",
+  href: "/verificador",
+  delay: 0.15,
+  badge: "Pré-processamento",
+};
 
 export default function Home() {
   return (
@@ -70,23 +83,57 @@ export default function Home() {
         </motion.div>
       </div>
 
+      {/* QUALITY CHECKER CARD */}
+      <motion.div
+        id="services"
+        initial={{ opacity: 0, y: 30 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.8, delay: qualityOption.delay, ease: [0.16, 1, 0.3, 1] }}
+        className="w-full max-w-6xl px-4 pt-16"
+      >
+        <Link
+          href={qualityOption.href}
+          className="group flex flex-col md:flex-row md:items-center glass-card p-10 md:p-12 hover:bg-white transition-all duration-500 border border-amber-100/60 hover:shadow-2xl hover:shadow-amber-500/5 hover:-translate-y-1 gap-8"
+        >
+          <div className="flex-1 space-y-4">
+            <div className="flex items-center space-x-3">
+              <span className="text-[10px] font-black uppercase tracking-widest bg-amber-100 text-amber-700 px-3 py-1 rounded-full">
+                {qualityOption.badge}
+              </span>
+            </div>
+            <h3 className="text-3xl font-black tracking-tighter text-slate-900 leading-none">
+              {qualityOption.title}
+            </h3>
+            <p className="text-slate-500 text-sm leading-relaxed font-medium max-w-2xl">
+              {qualityOption.desc}
+            </p>
+          </div>
+          <div className="flex md:flex-col items-center md:items-end space-x-4 md:space-x-0 md:space-y-4">
+            <qualityOption.icon className="w-10 h-10 text-amber-400" />
+            <div className="w-10 h-10 rounded-full border border-slate-100 flex items-center justify-center group-hover:bg-amber-500 group-hover:border-amber-500 transition-all duration-500">
+              <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-white transition-transform group-hover:translate-x-0.5" />
+            </div>
+          </div>
+        </Link>
+      </motion.div>
+
       {/* SERVICE GRID */}
-      <div id="services" className="grid md:grid-cols-3 gap-8 w-full max-w-6xl px-4 pt-16">
-        {options.map((opt) => (
+      <div className="grid md:grid-cols-3 gap-8 w-full max-w-6xl px-4 pt-8">
+        {options.map((opt, idx) => (
           <motion.div
             key={opt.title}
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: opt.delay, ease: [0.16, 1, 0.3, 1] }}
           >
-            <Link 
-              href={opt.href} 
+            <Link
+              href={opt.href}
               className="group flex flex-col h-full glass-card p-12 hover:bg-white transition-all duration-500 border border-slate-100/50 hover:shadow-2xl hover:shadow-purple-500/5 hover:-translate-y-2"
             >
               <div className="flex-grow space-y-6">
                 <div className="flex items-center justify-between">
                   <span className="text-technical text-slate-400 group-hover:text-purple-600 transition-colors">
-                    Pipeline AT-0{options.indexOf(opt) + 1}
+                    Pipeline AT-0{idx + 1}
                   </span>
                   <div className="w-10 h-10 rounded-full border border-slate-100 flex items-center justify-center group-hover:bg-purple-600 group-hover:border-purple-600 transition-all duration-500">
                     <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-white transition-transform group-hover:translate-x-0.5" />
@@ -96,7 +143,7 @@ export default function Home() {
                 <h3 className="text-3xl font-black tracking-tighter text-slate-900 leading-none">
                   {opt.title}
                 </h3>
-                
+
                 <p className="text-slate-500 text-sm leading-relaxed font-medium">
                   {opt.desc}
                 </p>
